@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm">
+            <div class="text-sm font-medium text-gray-400">Total Revenue at Risk</div>
+            <div class="mt-2 text-3xl font-bold text-white">₹{{ "%.2f"|format(stats.total_at_risk_inr) }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm">
+            <div class="text-sm font-medium text-gray-400">Total Recovered</div>
+            <div class="mt-2 text-3xl font-bold text-emerald-500">₹{{ "%.2f"|format(stats.total_recovered_inr) }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm">
+            <div class="text-sm font-medium text-gray-400">Recovery Rate</div>
+            <div class="mt-2 text-3xl font-bold text-blue-400">{{ stats.recovery_rate }}%</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-sm">
+            <div class="text-sm font-medium text-gray-400">Active Workflows</div>
+            <div class="mt-2 text-3xl font-bold text-white">{{ stats.active_workflows }}</div>
+        </div>
+    </div>
+
+    <!-- Event Type Counts -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+            <div class="text-xs text-gray-400 uppercase tracking-wide">Payment Failures</div>
+            <div class="mt-1 text-xl font-semibold text-red-400">{{ stats.payment_count }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+            <div class="text-xs text-gray-400 uppercase tracking-wide">Checkout Abandonment</div>
+            <div class="mt-1 text-xl font-semibold text-amber-400">{{ stats.checkout_count }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+            <div class="text-xs text-gray-400 uppercase tracking-wide">Subscription Failures</div>
+            <div class="mt-1 text-xl font-semibold text-orange-400">{{ stats.subscription_count }}</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+            <div class="text-xs text-gray-400 uppercase tracking-wide">Invoice Overdue</div>
+            <div class="mt-1 text-xl font-semibold text-purple-400">{{ stats.invoice_count }}</div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex space-x-4 items-center">
+        <button hx-post="/api/seed" hx-target="#action-result" hx-swap="innerHTML" 
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">
+            ⚡ Seed Data
+        </button>
+        <button hx-post="/api/batch" hx-target="#action-result" hx-swap="innerHTML"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
+            🚀 Run Batch Recovery
+        </button>
+        <a href="/api/metrics/export/csv" 
+           class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white border border-gray-600 rounded-md text-sm font-medium transition-colors">
+            📥 Export CSV
+        </a>
+        <div id="action-result" class="ml-4"></div>
+    </div>
+
+    <!-- Workflows Table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+            <h2 class="text-lg font-medium text-white">Recovery Workflows</h2>
+            <span class="text-xs text-gray-500">{{ workflows|length }} showing</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-400">
+                <thead class="bg-gray-700/50 text-gray-300 uppercase text-xs">
+                    <tr>
+                        <th class="px-6 py-3 font-medium">ID</th>
+                        <th class="px-6 py-3 font-medium">Type</th>
+                        <th class="px-6 py-3 font-medium">Customer</th>
+                        <th class="px-6 py-3 font-medium">Amount (₹)</th>
+                        <th class="px-6 py-3 font-medium">Status</th>
+                        <th class="px-6 py-3 font-medium">Root Cause</th>
+                        <th class="px-6 py-3 font-medium">Channel</th>
+                        <th class="px-6 py-3 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {% for w in workflows %}
+                    <tr class="hover:bg-gray-700/30 transition-colors">
+                        <td class="px-6 py-4 font-mono text-gray-300">
+                            <a href="/workflow/{{ w.id }}" class="hover:text-emerald-400 underline">{{ w.id[:8] }}</a>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if w.event_type == 'payment_failed' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">Payment</span>
+                            {% elif w.event_type == 'checkout_abandoned' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400">Checkout</span>
+                            {% elif w.event_type == 'subscription_failed' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400">Subscription</span>
+                            {% elif w.event_type == 'invoice_overdue' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">Invoice</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-200">{{ w.customer_name }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-200">₹{{ "%.2f"|format(w.amount_at_risk_inr) }}</td>
+                        <td class="px-6 py-4">
+                            {% if w.status == 'recovered' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400">✅ Recovered</span>
+                            {% elif w.status == 'escalated' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">🔴 Escalated</span>
+                            {% elif w.status == 'executing' or w.status == 'intervention_planned' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">🔄 In Progress</span>
+                            {% elif w.status == 'detected' or w.status == 'diagnosing' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-400">🔍 Detected</span>
+                            {% elif w.status == 'awaiting_promise' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400">⏳ Awaiting Promise</span>
+                            {% elif w.status == 'stopped_compliance' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-600 text-gray-300">🛑 Stopped</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-600 text-gray-200">{{ w.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-xs">{{ w.root_cause or '—' }}</td>
+                        <td class="px-6 py-4 text-xs">{{ w.current_channel or '—' }}</td>
+                        <td class="px-6 py-4">
+                            {% if not w.is_terminal %}
+                            <button hx-post="/api/simulate-recovery/{{ w.id }}" hx-target="#action-result" hx-swap="innerHTML"
+                                    class="text-xs text-emerald-400 hover:text-emerald-300 underline">
+                                Simulate Pay
+                            </button>
+                            {% else %}
+                            <span class="text-xs text-gray-600">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not workflows %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            No workflows yet. Click "Seed Data" then "Run Batch Recovery" to get started.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+# RecovrAI — AI Revenue Recovery Agent
+# Python Dependencies
+
+# === Web Framework ===
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+python-multipart==0.0.20
+websockets==15.0.1
+jinja2==3.1.6
+aiofiles==24.1.0
+
+# === Database ===
+sqlalchemy[asyncio]==2.0.41
+aiosqlite==0.21.0
+
+# === Razorpay ===
+razorpay==1.4.2
+
+# === AI / LLM ===
+groq==0.25.0
+google-genai==1.18.0
+openai==1.82.0
+
+# === Voice ===
+edge-tts==6.1.19
+webrtcvad-wheels==2.0.14
+
+# === Configuration ===
+pydantic==2.11.4
+pydantic-settings==2.9.1
+python-dotenv==1.1.0
+
+# === HTTP ===
+httpx==0.28.1
+
+# === Utilities ===
+python-dateutil==2.9.0
+pytz==2024.2
+rich==14.0.0
+
+# === Testing ===
+pytest==8.4.1
+pytest-asyncio==1.0.0
