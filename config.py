@@ -81,12 +81,12 @@ class Settings(BaseSettings):
 
     # === Groq API (Free Tier) ===
     groq_api_key: str = ""
-    groq_llm_model: str = "llama-3.1-70b-versatile"
+    groq_llm_model: str = "llama-3.3-70b-versatile"
     groq_whisper_model: str = "whisper-large-v3-turbo"
 
     # === Google Gemini API (Fallback) ===
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash-latest"
+    gemini_model: str = "gemini-3.5-flash"
 
     # === Twilio (Optional) ===
     twilio_account_sid: str = ""
