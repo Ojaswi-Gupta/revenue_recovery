@@ -15,7 +15,7 @@
         <div class="space-y-6">
             <div class="bg-gray-800 p-5 rounded-lg border border-gray-700">
                 <label class="block text-sm font-medium text-gray-300 mb-2">Select Target Workflow</label>
-                <select id="workflow-selector" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 mb-4">
+                <select id="workflow-selector" name="workflow_id" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 mb-4">
                     <option value="" disabled selected>Choose a workflow...</option>
                     {% for w in workflows %}
                     <option value="{{ w.id }}">{{ w.customer }} - {{ w.type }}</option>
@@ -70,7 +70,7 @@
             
             <!-- Text Fallback -->
             <div class="p-4 border-t border-gray-700 bg-gray-900 rounded-b-lg">
-                <form hx-post="/voice/demo" hx-target="#debug-log" hx-swap="beforeend" class="flex space-x-2" id="text-fallback-form">
+                <form hx-post="/voice/demo" hx-target="#debug-log" hx-swap="beforeend" hx-include="#workflow-selector" class="flex space-x-2" id="text-fallback-form">
                     <input type="text" name="message" placeholder="Type a message to simulate voice..." class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
                     <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">Send</button>
                 </form>

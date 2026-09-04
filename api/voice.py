@@ -210,19 +210,21 @@ class DemoResponse(BaseModel):
 _demo_states: Dict[str, ConversationState] = {}
 
 
-@router.post("/demo", response_model=DemoResponse)
-async def text_demo(request: DemoRequest):
+from fastapi import Form
+
+@router.post("/demo")
+async def text_demo(workflow_id: str = Form(...), message: str = Form(...)):
     """
     Text-based demo endpoint for testing the voice agent without a microphone.
-    Accepts text input, returns text + audio response.
+    Accepts HTMX form data, returns text + audio response.
     """
     agent = VoiceAgent()
 
-    if request.workflow_id not in _demo_states:
+    if workflow_id not in _demo_states:
         # Fetch workflow and initialize conversation
         async with get_db_session() as session:
             stmt = select(RecoveryWorkflow).where(
-                RecoveryWorkflow.id == request.workflow_id
+                RecoveryWorkflow.id == workflow_id
             )
             result = await session.execute(stmt)
             workflow = result.scalar_one_or_none()
@@ -230,18 +232,18 @@ async def text_demo(request: DemoRequest):
         if not workflow:
             raise HTTPException(status_code=404, detail="Workflow not found")
 
-        _demo_states[request.workflow_id] = await agent.start_conversation(workflow)
+        _demo_states[workflow_id] = await agent.start_conversation(workflow)
 
-    state = _demo_states[request.workflow_id]
+    state = _demo_states[workflow_id]
 
     if state.call_ended:
         # Clean up and return
-        _demo_states.pop(request.workflow_id, None)
+        _demo_states.pop(workflow_id, None)
         raise HTTPException(status_code=400, detail="Conversation already ended")
 
     # Process the user's text
-    state.conversation_history.append({"role": "user", "content": request.user_text})
-    response_text = await agent.generate_response(state, request.user_text)
+    state.conversation_history.append({"role": "user", "content": message})
+    response_text = await agent.generate_response(state, message)
     audio_bytes = await agent.synthesize_speech(response_text)
 
     state.turn_count += 1
@@ -249,12 +251,23 @@ async def text_demo(request: DemoRequest):
         state.call_ended = True
 
     if state.call_ended:
-        _demo_states.pop(request.workflow_id, None)
+        _demo_states.pop(workflow_id, None)
 
-    return DemoResponse(
-        response_text=response_text,
-        audio_base64=base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else "",
-        intent=state.customer_intent,
-        call_ended=state.call_ended,
-        turn=state.turn_count,
-    )
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else ""
+    
+    html = f"""
+    <div id="chat-container" hx-swap-oob="beforeend">
+        <div class="flex justify-start my-4">
+            <div class="max-w-[80%] rounded-2xl rounded-tl-sm px-4 py-2 bg-gray-700 text-gray-200 text-sm">
+                {response_text}
+            </div>
+        </div>
+        <audio autoplay src="data:audio/mp3;base64,{audio_b64}"></audio>
+    </div>
+    <div class="text-emerald-400">> Turn {state.turn_count} complete (Intent: {state.customer_intent})</div>
+    """
+    
+    if state.call_ended:
+        html += '<div class="text-red-400">> Call ended.</div>'
+        
+    return HTMLResponse(html)
