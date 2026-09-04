@@ -468,15 +468,16 @@ async def send_email_reminder(request: Request, workflow_id: str, to_vendor: boo
 
 
 @router.post("/api/workflow/{workflow_id}/call")
-async def trigger_voice_call(workflow_id: str, to_verified: bool = False):
+async def trigger_voice_call(workflow_id: str, to_verified: bool = False, to_test: bool = False):
     """
     Trigger an automated outbound voice call via Twilio.
-    If to_verified=True, dials the developer's verified phone number (+917991924011).
+    If to_verified=True or to_test=True, dials the developer's verified phone number (+917991924011).
     """
     from ..services.recovery_orchestrator import RecoveryOrchestrator
     import uuid
 
     orchestrator = RecoveryOrchestrator()
+    settings = get_settings()
 
     async with get_db_session() as session:
         stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
@@ -486,7 +487,7 @@ async def trigger_voice_call(workflow_id: str, to_verified: bool = False):
         if not workflow:
             return HTMLResponse('<div class="text-red-400 text-xs p-2">Workflow not found</div>', status_code=404)
 
-        target_phone = "+917991924011" if to_verified else workflow.customer_phone
+        target_phone = settings.test_phone_number if (to_verified or to_test) else workflow.customer_phone
         spoken_message = (
             f"Namaste {workflow.customer_name} ji. Yeh RecovrAI se automated revenue recovery call hai. "
             f"Aapka {workflow.event_type.replace('_', ' ')} ka payment of rupees {int(workflow.amount_at_risk_inr)} abhi tak process nahi ho paya tha."
@@ -502,6 +503,8 @@ async def trigger_voice_call(workflow_id: str, to_verified: bool = False):
         workflow.contact_attempts += 1
         workflow.current_channel = "voice_call"
         workflow.last_contact_at = datetime.utcnow()
+        if workflow.status in ("detected", "diagnosing", "intervention_planned"):
+            workflow.status = "executing"
 
         audit = AuditLog(
             id=str(uuid.uuid4()),
@@ -517,13 +520,161 @@ async def trigger_voice_call(workflow_id: str, to_verified: bool = False):
     if action.status == "failed":
         return HTMLResponse(
             f'<div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md shadow-sm">'
-            f'❌ Call failed: {action.error_message}'
+            f'❌ Voice Call failed: {action.error_message}'
             f'</div>'
         )
 
     return HTMLResponse(
         f'<div class="bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs px-3 py-2 rounded-md shadow-sm">'
         f'📞 Twilio voice call ringing <strong>{target_phone}</strong>!'
+        f'</div>'
+    )
+
+
+@router.post("/api/workflow/{workflow_id}/send-sms")
+async def send_sms_reminder(
+    request: Request,
+    workflow_id: str,
+    to_test: bool = False,
+    to_verified: bool = False,
+):
+    """
+    Trigger SMS dispatch via Twilio.
+    If to_test=True or to_verified=True, sends to configured test phone (+917991924011).
+    """
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    import uuid
+
+    orchestrator = RecoveryOrchestrator()
+    settings = get_settings()
+
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse('<div class="text-red-400 text-xs p-2">Workflow not found</div>', status_code=404)
+
+        target_phone = settings.test_phone_number if (to_test or to_verified) else workflow.customer_phone
+        payment_link_url = f"{request.base_url}pay/{workflow.id}"
+
+        message = orchestrator.notification_service.build_recovery_sms(
+            customer_name=workflow.customer_name,
+            amount_inr=workflow.amount_at_risk_inr,
+            payment_link_url=payment_link_url,
+            failure_reason=workflow.root_cause or "",
+        )
+
+        action = await orchestrator.notification_service.send_sms(
+            phone=target_phone,
+            message=message,
+            workflow_id=workflow.id,
+        )
+        session.add(action)
+
+        workflow.contact_attempts += 1
+        workflow.current_channel = "sms"
+        workflow.last_contact_at = datetime.utcnow()
+        if workflow.status in ("detected", "diagnosing", "intervention_planned"):
+            workflow.status = "executing"
+
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow.id,
+            action="twilio_sms_dispatched",
+            actor="vendor_operator",
+            category="action",
+            details=f"Twilio SMS reminder sent to {target_phone} for ₹{workflow.amount_at_risk_inr:.2f}",
+            metadata_json=json.dumps({"to": target_phone, "status": action.status}),
+        )
+        session.add(audit)
+
+    if action.status == "failed":
+        return HTMLResponse(
+            f'<div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md shadow-sm">'
+            f'❌ SMS delivery failed: {action.error_message}'
+            f'</div>'
+        )
+
+    return HTMLResponse(
+        f'<div class="bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs px-3 py-2 rounded-md shadow-sm">'
+        f'💬 SMS dispatched via Twilio to <strong>{target_phone}</strong> with payment link!'
+        f'</div>'
+    )
+
+
+@router.post("/api/workflow/{workflow_id}/send-whatsapp")
+async def send_whatsapp_reminder(
+    request: Request,
+    workflow_id: str,
+    to_test: bool = False,
+    to_verified: bool = False,
+):
+    """
+    Trigger WhatsApp reminder via Twilio API and provide 1-click wa.me instant link.
+    If to_test=True or to_verified=True, sends to configured test phone (+917991924011).
+    """
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    import uuid
+
+    orchestrator = RecoveryOrchestrator()
+    settings = get_settings()
+
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse('<div class="text-red-400 text-xs p-2">Workflow not found</div>', status_code=404)
+
+        target_phone = settings.test_phone_number if (to_test or to_verified) else workflow.customer_phone
+        payment_link_url = f"{request.base_url}pay/{workflow.id}"
+        first_name = workflow.customer_name.split()[0]
+
+        message = (
+            f"Namaste {first_name}! Your payment of ₹{workflow.amount_at_risk_inr:,.2f} "
+            f"could not be processed for {workflow.event_type.replace('_', ' ')}. "
+            f"Please complete it securely here: {payment_link_url} - RecovrAI"
+        )
+        wa_link = orchestrator.notification_service.build_whatsapp_direct_link(target_phone, message)
+
+        action = await orchestrator.notification_service.send_whatsapp(
+            phone=target_phone,
+            message=message,
+            workflow_id=workflow.id,
+        )
+        session.add(action)
+
+        workflow.contact_attempts += 1
+        workflow.current_channel = "whatsapp"
+        workflow.last_contact_at = datetime.utcnow()
+        if workflow.status in ("detected", "diagnosing", "intervention_planned"):
+            workflow.status = "executing"
+
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow.id,
+            action="whatsapp_reminder_dispatched",
+            actor="vendor_operator",
+            category="action",
+            details=f"WhatsApp reminder dispatched to {target_phone}",
+            metadata_json=json.dumps({"to": target_phone, "status": action.status, "wa_link": wa_link}),
+        )
+        session.add(audit)
+
+    if action.status == "success":
+        dispatch_badge = f'<span class="text-emerald-400 font-medium">✅ Twilio API Sent</span>'
+    else:
+        dispatch_badge = f'<span class="text-amber-400 text-xs" title="{action.error_message}">⚠️ Twilio Sandbox Join Required</span>'
+
+    return HTMLResponse(
+        f'<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-3 py-2 rounded-md shadow-sm flex items-center justify-between gap-3">'
+        f'<div>📱 WhatsApp to <strong>{target_phone}</strong>: {dispatch_badge}</div>'
+        f'<a href="{wa_link}" target="_blank" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs shadow inline-flex items-center gap-1 transition-colors">'
+        f'<span>💬 Open WhatsApp Chat</span> →'
+        f'</a>'
         f'</div>'
     )
 

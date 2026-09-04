@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # === Groq API (Free Tier) ===
     groq_api_key: str = ""
-    groq_llm_model: str = "llama-3.3-70b-versatile"
+    groq_llm_model: str = "llama-3.1-8b-instant"
     groq_whisper_model: str = "whisper-large-v3-turbo"
 
     # === Google Gemini API (Fallback) ===
@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
+    twilio_whatsapp_number: str = ""
+    test_phone_number: str = "+917991924011"
 
     # === Recovery Policy Constants ===
     max_contact_attempts: int = 5

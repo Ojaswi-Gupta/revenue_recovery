@@ -119,17 +119,25 @@
                         <td class="px-6 py-4 text-xs">{{ w.current_channel or '—' }}</td>
                         <td class="px-6 py-4">
                             {% if w.status != 'recovered' %}
-                            <div class="flex items-center space-x-2 whitespace-nowrap">
-                                <button hx-post="/api/workflow/{{ w.id }}/send-email" hx-target="#action-result" hx-swap="innerHTML"
-                                        class="px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded text-xs font-medium border border-blue-500/30 transition-colors" title="Send reminder to customer">
-                                    ✉️ Remind
-                                </button>
+                            <div class="flex items-center space-x-1.5 whitespace-nowrap">
                                 <button hx-post="/api/workflow/{{ w.id }}/send-email?to_vendor=true" hx-target="#action-result" hx-swap="innerHTML"
-                                        class="px-2 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 rounded text-xs font-medium border border-indigo-500/30 transition-colors" title="Send test preview directly to your own configured Gmail">
-                                    📬 Test to Me
+                                        class="px-2 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 rounded text-xs font-medium border border-indigo-500/30 transition-colors" title="Send test preview to your configured email">
+                                    📬 Email
+                                </button>
+                                <button hx-post="/api/workflow/{{ w.id }}/send-sms?to_test=true" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="px-2 py-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 rounded text-xs font-medium border border-sky-500/30 transition-colors" title="Send real SMS via Twilio to +917991924011">
+                                    💬 SMS
+                                </button>
+                                <button hx-post="/api/workflow/{{ w.id }}/call?to_verified=true" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="px-2 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded text-xs font-medium border border-purple-500/30 transition-colors" title="Twilio Voice Call to +917991924011">
+                                    📞 Call
+                                </button>
+                                <button hx-post="/api/workflow/{{ w.id }}/send-whatsapp?to_test=true" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="px-2 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 rounded text-xs font-medium border border-emerald-500/30 transition-colors" title="WhatsApp Message / Click-to-Chat to +917991924011">
+                                    📱 WhatsApp
                                 </button>
                                 <button hx-post="/api/simulate-recovery/{{ w.id }}" hx-target="#action-result" hx-swap="innerHTML"
-                                        class="text-xs text-emerald-400 hover:text-emerald-300 underline">
+                                        class="px-2 py-1 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 rounded text-xs font-medium border border-emerald-800/40 transition-colors" title="Simulate payment settlement">
                                     Pay
                                 </button>
                             </div>

@@ -18,18 +18,20 @@
             </div>
             <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400">
                 <div class="flex items-center"><span class="text-gray-500 mr-2">👤</span> {{ workflow.customer_name }}</div>
-                <div class="flex items-center"><span class="text-gray-500 mr-2">📞</span> {{ workflow.customer_phone }}</div>
+                <div class="flex items-center"><span class="text-gray-500 mr-2">📞</span> {{ workflow.customer_phone }} <span class="ml-2 text-xs bg-gray-700/80 text-gray-300 px-1.5 py-0.5 rounded border border-gray-600">Test: +917991924011</span></div>
                 <div class="flex items-center"><span class="text-gray-500 mr-2">✉️</span> {{ workflow.customer_email }}</div>
                 <div class="flex items-center"><span class="text-gray-500 mr-2">📋</span> {{ workflow.event_type | replace('_', ' ') | title }}</div>
             </div>
         </div>
         {% if workflow.status != 'recovered' %}
         <div class="flex flex-wrap gap-2">
-            <button hx-post="/api/workflow/{{ workflow.id }}/send-email" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">✉️ Send to Customer</button>
-            <button hx-post="/api/workflow/{{ workflow.id }}/send-email?to_vendor=true" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm" title="Send a test preview to your own configured Gmail address">📬 Send Test to My Email</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/send-email" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">✉️ Email Customer</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/send-email?to_vendor=true" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm" title="Send a test preview to your own configured Gmail address">📬 Test Email to Me</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/send-sms?to_test=true" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm" title="Send live SMS via Twilio to +917991924011">💬 Test SMS to Me</button>
             <button hx-post="/api/workflow/{{ workflow.id }}/call?to_verified=true" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm" title="Trigger real outbound Twilio call to your verified phone (+917991924011)">📞 Twilio Call My Phone</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/send-whatsapp?to_test=true" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm" title="Send WhatsApp test / open direct chat with +917991924011">📱 WhatsApp My Phone</button>
             <a href="/voice/console" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-md text-sm font-medium transition-colors shadow-sm flex items-center space-x-1"><span>🎙️ Web Voice AI</span></a>
-            <button hx-post="/api/simulate-recovery/{{ workflow.id }}" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Simulate Payment</button>
+            <button hx-post="/api/simulate-recovery/{{ workflow.id }}" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Simulate Payment</button>
             <button hx-post="/api/workflow/{{ workflow.id }}/escalate" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Escalate</button>
             <button hx-post="/api/workflow/{{ workflow.id }}/stop" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Stop</button>
         </div>

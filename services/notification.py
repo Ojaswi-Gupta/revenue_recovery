@@ -68,11 +68,14 @@ class NotificationService:
 
         try:
             if self._twilio_client:
-                result = self._twilio_client.messages.create(
-                    body=message,
-                    from_=self.settings.twilio_phone_number,
-                    to=phone,
-                )
+                import asyncio
+                def _send_sms_sync():
+                    return self._twilio_client.messages.create(
+                        body=message,
+                        from_=self.settings.twilio_phone_number,
+                        to=phone,
+                    )
+                result = await asyncio.to_thread(_send_sms_sync)
                 action.status = "success"
                 action.response_payload = json.dumps({
                     "sid": result.sid,
@@ -208,11 +211,16 @@ class NotificationService:
 
         try:
             if self._twilio_client:
-                result = self._twilio_client.messages.create(
-                    body=message,
-                    from_="whatsapp:" + self.settings.twilio_phone_number,
-                    to="whatsapp:" + phone,
-                )
+                import asyncio
+                wa_from = self.settings.twilio_whatsapp_number or ("whatsapp:" + self.settings.twilio_phone_number)
+                wa_to = phone if phone.startswith("whatsapp:") else ("whatsapp:" + phone)
+                def _send_wa_sync():
+                    return self._twilio_client.messages.create(
+                        body=message,
+                        from_=wa_from,
+                        to=wa_to,
+                    )
+                result = await asyncio.to_thread(_send_wa_sync)
                 action.status = "success"
                 action.response_payload = json.dumps({
                     "sid": result.sid,
@@ -236,6 +244,13 @@ class NotificationService:
             logger.error(f"WhatsApp failed to {phone}: {e}")
 
         return action
+
+    def build_whatsapp_direct_link(self, phone: str, message: str) -> str:
+        """Generate a WhatsApp click-to-chat web/mobile link."""
+        import urllib.parse
+        clean_phone = "".join(filter(str.isdigit, phone))
+        encoded_msg = urllib.parse.quote(message)
+        return f"https://wa.me/{clean_phone}?text={encoded_msg}"
 
     async def make_voice_call(
         self,
