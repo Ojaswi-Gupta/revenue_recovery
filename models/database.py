@@ -36,17 +36,20 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
+        connect_args = {"timeout": 30} if "sqlite" in settings.database_url else {}
         _engine = create_async_engine(
             settings.database_url,
             echo=(settings.log_level == "DEBUG"),
             pool_pre_ping=True,
+            connect_args=connect_args,
         )
-        # Enable WAL mode for SQLite for better concurrent access
+        # Enable WAL mode and busy timeout for SQLite for seamless concurrent access
         if "sqlite" in settings.database_url:
             @event.listens_for(_engine.sync_engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=30000")
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.close()
     return _engine

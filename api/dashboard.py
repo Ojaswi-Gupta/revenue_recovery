@@ -277,16 +277,17 @@ async def stop_workflow(workflow_id: str):
 
 
 @router.post("/api/workflow/{workflow_id}/send-email")
-async def send_email_reminder(workflow_id: str):
+async def send_email_reminder(workflow_id: str, to_vendor: bool = False):
     """
     Vendor 1-click trigger: Dispatch a professional email reminder
-    with a live Razorpay payment link directly to the customer.
+    with a live Razorpay payment link directly to the customer (or vendor test inbox).
     """
     from ..models.events import InvoiceEvent
     from ..services.recovery_orchestrator import RecoveryOrchestrator
     import uuid
 
     orchestrator = RecoveryOrchestrator()
+    settings = get_settings()
 
     async with get_db_session() as session:
         stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
@@ -322,7 +323,10 @@ async def send_email_reminder(workflow_id: str):
                 days_overdue = getattr(inv, "days_overdue", 14)
                 amount_due_inr = inv.amount_inr
 
-        # 3. Build rich HTML email
+        # 3. Determine target recipient: customer email vs vendor test email
+        target_email = settings.smtp_user if (to_vendor and settings.smtp_user) else workflow.customer_email
+
+        # 4. Build rich HTML email
         subject, plain_text, html_body = orchestrator.notification_service.build_invoice_html_email(
             customer_name=workflow.customer_name,
             company_name=company_name,
@@ -332,9 +336,12 @@ async def send_email_reminder(workflow_id: str):
             payment_link_url=payment_link_url,
         )
 
-        # 4. Dispatch email
+        if to_vendor:
+            subject = f"[TEST PREVIEW] {subject}"
+
+        # 5. Dispatch email
         action = await orchestrator.notification_service.send_email(
-            email=workflow.customer_email,
+            email=target_email,
             subject=subject,
             body=plain_text,
             workflow_id=workflow.id,
@@ -342,14 +349,14 @@ async def send_email_reminder(workflow_id: str):
         )
         session.add(action)
 
-        # 5. Update workflow state & metrics
+        # 6. Update workflow state & metrics
         workflow.contact_attempts += 1
         workflow.current_channel = "email"
         workflow.last_contact_at = datetime.utcnow()
         if workflow.status in ("detected", "diagnosing", "intervention_planned"):
             workflow.status = "executing"
 
-        # 6. Audit trail
+        # 7. Audit trail
         audit = AuditLog(
             id=str(uuid.uuid4()),
             workflow_id=workflow.id,
@@ -357,22 +364,30 @@ async def send_email_reminder(workflow_id: str):
             actor="vendor_operator",
             category="action",
             details=(
-                f"Vendor dispatched 1-click email reminder to {workflow.customer_email} "
+                f"Vendor dispatched email reminder to {target_email} "
                 f"for ₹{amount_due_inr:,.2f} (Invoice {invoice_number}). Razorpay link: {payment_link_url}"
             ),
             metadata_json=json.dumps({
-                "to": workflow.customer_email,
+                "to": target_email,
                 "invoice_number": invoice_number,
                 "amount_inr": amount_due_inr,
                 "payment_link": payment_link_url,
                 "attempt": workflow.contact_attempts,
+                "status": action.status,
             }),
         )
         session.add(audit)
 
+    if action.status == "failed":
+        return HTMLResponse(
+            f'<div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md shadow-sm">'
+            f'❌ Email delivery failed: {action.error_message}'
+            f'</div>'
+        )
+
     return HTMLResponse(
         f'<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-2 rounded-md shadow-sm">'
-        f'✉️ Reminder dispatched to <strong>{workflow.customer_email}</strong> '
+        f'✉️ Reminder dispatched to <strong>{target_email}</strong> '
         f'(Attempt #{workflow.contact_attempts}) with payment link.'
         f'</div>'
     )
