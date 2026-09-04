@@ -13,21 +13,25 @@
                     {% elif workflow.status == 'executing' %}bg-blue-500/20 text-blue-400
                     {% elif workflow.status == 'awaiting_promise' %}bg-amber-500/20 text-amber-400
                     {% else %}bg-gray-500/20 text-gray-400{% endif %}">
-                    {{ workflow.status | title }}
+                    {{ workflow.status | replace('_', ' ') | title }}
                 </span>
             </div>
             <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400">
-                <div class="flex items-center"><span class="text-gray-500 mr-2">👤</span> {{ workflow.customer.name }}</div>
-                <div class="flex items-center"><span class="text-gray-500 mr-2">📞</span> {{ workflow.customer.phone }}</div>
-                <div class="flex items-center"><span class="text-gray-500 mr-2">✉️</span> {{ workflow.customer.email }}</div>
+                <div class="flex items-center"><span class="text-gray-500 mr-2">👤</span> {{ workflow.customer_name }}</div>
+                <div class="flex items-center"><span class="text-gray-500 mr-2">📞</span> {{ workflow.customer_phone }}</div>
+                <div class="flex items-center"><span class="text-gray-500 mr-2">✉️</span> {{ workflow.customer_email }}</div>
+                <div class="flex items-center"><span class="text-gray-500 mr-2">📋</span> {{ workflow.event_type | replace('_', ' ') | title }}</div>
             </div>
         </div>
+        {% if not workflow.is_terminal %}
         <div class="flex space-x-3">
-            <button hx-post="/api/workflow/{{ workflow.id }}/simulate-payment" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">Simulate Payment</button>
-            <button hx-post="/api/workflow/{{ workflow.id }}/escalate" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-colors">Escalate</button>
-            <button hx-post="/api/workflow/{{ workflow.id }}/stop" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-md text-sm font-medium transition-colors">Stop</button>
+            <button hx-post="/api/simulate-recovery/{{ workflow.id }}" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">Simulate Payment</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/escalate" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-colors">Escalate</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/stop" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-md text-sm font-medium transition-colors">Stop</button>
         </div>
+        {% endif %}
     </div>
+    <div id="action-feedback"></div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Financial Card -->
@@ -36,20 +40,20 @@
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <div class="text-xs text-gray-400 uppercase tracking-wide">Amount at Risk</div>
-                    <div class="mt-1 text-2xl font-semibold text-gray-200">₹{{ workflow.financial.amount_at_risk }}</div>
+                    <div class="mt-1 text-2xl font-semibold text-gray-200">₹{{ "%.2f"|format(workflow.amount_at_risk_inr) }}</div>
                 </div>
                 <div>
                     <div class="text-xs text-gray-400 uppercase tracking-wide">Amount Recovered</div>
-                    <div class="mt-1 text-2xl font-semibold text-emerald-500">₹{{ workflow.financial.amount_recovered }}</div>
+                    <div class="mt-1 text-2xl font-semibold text-emerald-500">₹{{ "%.2f"|format(workflow.amount_recovered_inr) }}</div>
                 </div>
             </div>
             <div>
                 <div class="flex justify-between text-xs text-gray-400 mb-1">
                     <span>Recovery Progress</span>
-                    <span>{{ workflow.financial.recovery_rate }}%</span>
+                    <span>{{ "%.1f"|format(workflow.recovery_rate) }}%</span>
                 </div>
                 <div class="w-full bg-gray-900 rounded-full h-2">
-                    <div class="bg-emerald-500 h-2 rounded-full" style="width: {{ workflow.financial.recovery_rate }}%"></div>
+                    <div class="bg-emerald-500 h-2 rounded-full" style="width: {{ workflow.recovery_rate }}%"></div>
                 </div>
             </div>
         </div>
@@ -59,48 +63,57 @@
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-medium text-white">Diagnosis Engine</h2>
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
-                    {% if workflow.diagnosis.urgency == 'high' %}bg-red-500/20 text-red-400
-                    {% elif workflow.diagnosis.urgency == 'medium' %}bg-amber-500/20 text-amber-400
+                    {% if workflow.urgency == 'critical' %}bg-red-500/20 text-red-400
+                    {% elif workflow.urgency == 'high' %}bg-orange-500/20 text-orange-400
+                    {% elif workflow.urgency == 'medium' %}bg-amber-500/20 text-amber-400
                     {% else %}bg-emerald-500/20 text-emerald-400{% endif %}">
-                    {{ workflow.diagnosis.urgency | title }} Urgency
+                    {{ workflow.urgency | title }} Urgency
                 </span>
             </div>
             <div class="space-y-4">
                 <div>
                     <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Root Cause</div>
-                    <div class="text-gray-200 font-medium">{{ workflow.diagnosis.root_cause }}</div>
-                    <div class="text-sm text-gray-400 mt-1">{{ workflow.diagnosis.description }}</div>
+                    <div class="text-gray-200 font-medium">{{ workflow.root_cause or "Pending diagnosis" }}</div>
+                    <div class="text-sm text-gray-400 mt-1">{{ workflow.diagnosis_description or "" }}</div>
                 </div>
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-400">Rule Match: <span class="text-gray-200">{{ workflow.diagnosis.rule_used }}</span></span>
+                    <span class="text-gray-400">Rule: <span class="text-gray-200">{{ workflow.diagnosis_rule or "LLM Fallback" }}</span></span>
                     <div class="flex items-center w-1/3">
                         <span class="text-gray-400 mr-2 text-xs">Conf:</span>
                         <div class="w-full bg-gray-900 rounded-full h-1.5 flex-1 mr-2">
-                            <div class="bg-blue-500 h-1.5 rounded-full" style="width: {{ workflow.diagnosis.confidence }}%"></div>
+                            <div class="bg-blue-500 h-1.5 rounded-full" style="width: {{ (workflow.confidence * 100) }}%"></div>
                         </div>
-                        <span class="text-gray-200 text-xs">{{ workflow.diagnosis.confidence }}%</span>
+                        <span class="text-gray-200 text-xs">{{ "%.0f"|format(workflow.confidence * 100) }}%</span>
                     </div>
                 </div>
+                {% if workflow.recommended_action %}
+                <div class="text-sm">
+                    <span class="text-gray-400">Action: </span>
+                    <span class="text-emerald-400 font-medium">{{ workflow.recommended_action | replace('_', ' ') | title }}</span>
+                </div>
+                {% endif %}
             </div>
         </div>
         
         <!-- Promise Card -->
-        {% if workflow.promise %}
+        {% if workflow.promise_date %}
         <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
             <h2 class="text-lg font-medium text-white mb-4">Promise to Pay</h2>
             <div class="space-y-3">
                 <div class="flex justify-between">
                     <span class="text-gray-400 text-sm">Promise Date:</span>
-                    <span class="text-gray-200 text-sm font-medium">{{ workflow.promise.date }}</span>
+                    <span class="text-gray-200 text-sm font-medium">{{ workflow.promise_date.strftime('%d %b %Y') if workflow.promise_date else 'N/A' }}</span>
                 </div>
+                {% if workflow.promise_amount %}
                 <div class="flex justify-between">
                     <span class="text-gray-400 text-sm">Promise Amount:</span>
-                    <span class="text-gray-200 text-sm font-medium">₹{{ workflow.promise.amount }}</span>
+                    <span class="text-gray-200 text-sm font-medium">₹{{ "%.2f"|format(workflow.promise_amount / 100) }}</span>
                 </div>
+                {% endif %}
                 <div class="flex justify-between">
                     <span class="text-gray-400 text-sm">Status:</span>
-                    <span class="text-sm font-medium {% if workflow.promise.fulfilled %}text-emerald-500{% else %}text-amber-500{% endif %}">
-                        {{ "Fulfilled" if workflow.promise.fulfilled else "Pending" }}
+                    <span class="text-sm font-medium {% if workflow.promise_fulfilled %}text-emerald-500{% else %}text-amber-500{% endif %}">
+                        {{ "Fulfilled" if workflow.promise_fulfilled else "Pending" }}
                     </span>
                 </div>
             </div>
@@ -114,20 +127,32 @@
                 <div>
                     <div class="flex justify-between text-xs text-gray-400 mb-1">
                         <span>Contact Attempts (Max 5)</span>
-                        <span>{{ workflow.compliance.attempts }}/5</span>
+                        <span>{{ workflow.contact_attempts }}/5</span>
                     </div>
                     <div class="w-full bg-gray-900 rounded-full h-2">
-                        <div class="bg-blue-500 h-2 rounded-full" style="width: {{ (workflow.compliance.attempts / 5) * 100 }}%"></div>
+                        <div class="bg-blue-500 h-2 rounded-full" style="width: {{ (workflow.contact_attempts / 5 * 100) | int }}%"></div>
                     </div>
                 </div>
                 <div class="flex justify-between border-t border-gray-700 pt-3">
                     <span class="text-gray-400 text-sm">Current Channel:</span>
-                    <span class="text-gray-200 text-sm font-medium">{{ workflow.compliance.current_channel }}</span>
+                    <span class="text-gray-200 text-sm font-medium">{{ (workflow.current_channel or "—") | replace('_', ' ') | title }}</span>
                 </div>
                 <div class="flex justify-between border-t border-gray-700 pt-3">
                     <span class="text-gray-400 text-sm">Last Contact:</span>
-                    <span class="text-gray-200 text-sm">{{ workflow.compliance.last_contact_time }}</span>
+                    <span class="text-gray-200 text-sm">{{ workflow.last_contact_at.strftime('%d %b %Y %H:%M') if workflow.last_contact_at else "—" }}</span>
                 </div>
+                {% if workflow.payment_link_url %}
+                <div class="flex justify-between border-t border-gray-700 pt-3">
+                    <span class="text-gray-400 text-sm">Payment Link:</span>
+                    <a href="{{ workflow.payment_link_url }}" target="_blank" class="text-emerald-400 text-sm hover:underline">{{ workflow.payment_link_url }}</a>
+                </div>
+                {% endif %}
+                {% if workflow.stopped_reason %}
+                <div class="border-t border-gray-700 pt-3">
+                    <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Stopped Reason</div>
+                    <div class="text-sm text-red-400">{{ workflow.stopped_reason }}</div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -135,24 +160,29 @@
     <!-- Timeline -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
         <h2 class="text-lg font-medium text-white mb-6">Action Timeline</h2>
+        {% if audit_logs %}
         <div class="relative pl-6 border-l border-gray-700 space-y-8">
-            {% for action in actions %}
+            {% for log in audit_logs %}
             <div class="relative">
                 <div class="absolute -left-[33px] bg-gray-800 p-1 rounded-full border border-gray-700 text-sm">
-                    {% if action.actor == 'system' %}⚙️
-                    {% elif action.actor == 'voice_agent' %}🎙️
-                    {% elif action.actor == 'orchestrator' %}🧠
-                    {% elif action.actor == 'compliance' %}🛡️
+                    {% if log.actor == 'system' %}⚙️
+                    {% elif log.actor == 'voice_agent' %}🎙️
+                    {% elif log.actor == 'orchestrator' %}🧠
+                    {% elif log.actor == 'compliance' %}🛡️
+                    {% elif log.actor == 'diagnosis_engine' %}🔍
                     {% else %}📌{% endif %}
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-1">
-                    <h3 class="text-sm font-medium text-gray-200">{{ action.title }}</h3>
-                    <time class="text-xs text-gray-500">{{ action.timestamp }}</time>
+                    <h3 class="text-sm font-medium text-gray-200">{{ log.action | replace('_', ' ') | title }}</h3>
+                    <time class="text-xs text-gray-500">{{ log.timestamp.strftime('%d %b %Y %H:%M:%S') if log.timestamp else '' }}</time>
                 </div>
-                <div class="text-sm text-gray-400 mb-1"><span class="font-medium text-gray-500">{{ action.actor }}:</span> {{ action.details }}</div>
+                <div class="text-sm text-gray-400 mb-1"><span class="font-medium text-gray-500">{{ log.actor }}:</span> {{ log.details }}</div>
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <div class="text-gray-500 text-sm text-center py-8">No audit logs yet for this workflow.</div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

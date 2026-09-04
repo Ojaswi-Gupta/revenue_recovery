@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Dict
 
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, Depends, Form, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -209,8 +209,6 @@ class DemoResponse(BaseModel):
 # In-memory state store for demo conversations
 _demo_states: Dict[str, ConversationState] = {}
 
-
-from fastapi import Form
 
 @router.post("/demo")
 async def text_demo(workflow_id: str = Form(...), message: str = Form(...)):

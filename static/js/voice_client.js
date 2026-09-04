@@ -17,7 +17,7 @@ class VoiceClient {
     
     initWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        this.ws = new WebSocket(`${protocol}//localhost:8000/voice/ws/${this.workflowId}`);
+        this.ws = new WebSocket(`${protocol}//${window.location.host}/voice/ws/${this.workflowId}`);
         
         this.ws.onopen = () => {
             this.updateStatus('Connected', 'success');

@@ -18,7 +18,7 @@
                 <select id="workflow-selector" name="workflow_id" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 mb-4">
                     <option value="" disabled selected>Choose a workflow...</option>
                     {% for w in workflows %}
-                    <option value="{{ w.id }}">{{ w.customer }} - {{ w.type }}</option>
+                    <option value="{{ w.id }}">{{ w.customer_name }} - {{ w.event_type }}</option>
                     {% endfor %}
                 </select>
                 

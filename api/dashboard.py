@@ -216,7 +216,68 @@ async def opt_out_customer(phone: str):
     )
 
 
+@router.post("/api/workflow/{workflow_id}/escalate")
+async def escalate_workflow(workflow_id: str):
+    """Manually escalate a workflow to human review."""
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+
+    orchestrator = RecoveryOrchestrator()
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse(
+                '<div class="text-red-400 text-sm p-2">❌ Workflow not found</div>'
+            )
+
+        workflow = await orchestrator._escalate_workflow(
+            session, workflow, "Manually escalated by operator"
+        )
+
+    return HTMLResponse(
+        f'<div class="text-amber-400 text-sm p-2">'
+        f'⚠️ Workflow {workflow_id[:8]} escalated to human agent.</div>'
+    )
+
+
+@router.post("/api/workflow/{workflow_id}/stop")
+async def stop_workflow(workflow_id: str):
+    """Manually stop a workflow (compliance override)."""
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse(
+                '<div class="text-red-400 text-sm p-2">❌ Workflow not found</div>'
+            )
+
+        workflow.status = "stopped_compliance"
+        workflow.stopped_reason = "Manually stopped by operator"
+
+        from ..models.recovery import AuditLog
+        import uuid
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow_id,
+            action="workflow_manually_stopped",
+            actor="operator",
+            category="compliance",
+            details=f"Workflow {workflow_id[:8]} manually stopped by operator.",
+        )
+        session.add(audit)
+
+    return HTMLResponse(
+        f'<div class="text-gray-400 text-sm p-2">'
+        f'🛑 Workflow {workflow_id[:8]} stopped.</div>'
+    )
+
+
 # ─── HTMX Partials ──────────────────────────────────────────────────────────
+
 
 @router.get("/partials/workflows-table")
 async def workflows_table_partial(

@@ -4,37 +4,38 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold text-white">Audit Trail</h1>
+        <a href="/api/metrics/audit/export/csv" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-sm font-medium transition-colors">📥 Export CSV</a>
     </div>
 
     <!-- Filters -->
-    <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-wrap gap-4 items-end">
+    <form method="get" action="/audit" class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-wrap gap-4 items-end">
         <div class="flex-1 min-w-[200px]">
             <label class="block text-xs font-medium text-gray-400 mb-1">Workflow ID</label>
-            <input type="text" placeholder="Filter by ID..." class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+            <input type="text" name="workflow_id" value="{{ filter_workflow_id }}" placeholder="Filter by ID..." class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
         </div>
         <div class="w-48">
             <label class="block text-xs font-medium text-gray-400 mb-1">Category</label>
-            <select class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500">
-                <option value="all">All Categories</option>
-                <option value="action">Action</option>
-                <option value="decision">Decision</option>
-                <option value="compliance">Compliance</option>
-                <option value="error">Error</option>
+            <select name="category" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500">
+                <option value="all" {% if filter_category == 'all' %}selected{% endif %}>All Categories</option>
+                <option value="action" {% if filter_category == 'action' %}selected{% endif %}>Action</option>
+                <option value="decision" {% if filter_category == 'decision' %}selected{% endif %}>Decision</option>
+                <option value="compliance" {% if filter_category == 'compliance' %}selected{% endif %}>Compliance</option>
+                <option value="error" {% if filter_category == 'error' %}selected{% endif %}>Error</option>
             </select>
         </div>
         <div class="w-48">
             <label class="block text-xs font-medium text-gray-400 mb-1">Actor</label>
-            <select class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500">
-                <option value="all">All Actors</option>
-                <option value="system">System</option>
-                <option value="diagnosis_engine">Diagnosis Engine</option>
-                <option value="orchestrator">Orchestrator</option>
-                <option value="compliance">Compliance</option>
-                <option value="voice_agent">Voice Agent</option>
+            <select name="actor" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-emerald-500">
+                <option value="all" {% if filter_actor == 'all' %}selected{% endif %}>All Actors</option>
+                <option value="system" {% if filter_actor == 'system' %}selected{% endif %}>System</option>
+                <option value="diagnosis_engine" {% if filter_actor == 'diagnosis_engine' %}selected{% endif %}>Diagnosis Engine</option>
+                <option value="orchestrator" {% if filter_actor == 'orchestrator' %}selected{% endif %}>Orchestrator</option>
+                <option value="compliance" {% if filter_actor == 'compliance' %}selected{% endif %}>Compliance</option>
+                <option value="voice_agent" {% if filter_actor == 'voice_agent' %}selected{% endif %}>Voice Agent</option>
             </select>
         </div>
-        <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-sm font-medium transition-colors">Apply Filters</button>
-    </div>
+        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">Apply Filters</button>
+    </form>
 
     <!-- Table -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
@@ -53,8 +54,8 @@
                 <tbody class="divide-y divide-gray-700">
                     {% for log in logs %}
                     <tr class="hover:bg-gray-700/30 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">{{ log.timestamp }}</td>
-                        <td class="px-6 py-4 font-mono text-gray-300"><a href="/workflow/{{ log.workflow_id }}" class="hover:text-emerald-400">{{ log.workflow_id[:8] }}</a></td>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ log.timestamp.strftime('%d %b %H:%M:%S') if log.timestamp else '' }}</td>
+                        <td class="px-6 py-4 font-mono text-gray-300"><a href="/workflow/{{ log.workflow_id }}" class="hover:text-emerald-400">{{ log.workflow_id[:8] if log.workflow_id else '—' }}</a></td>
                         <td class="px-6 py-4">
                             {% if log.category == 'action' %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">Action</span>
@@ -69,8 +70,12 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 text-gray-300">{{ log.actor }}</td>
-                        <td class="px-6 py-4 text-gray-200 font-medium">{{ log.action }}</td>
-                        <td class="px-6 py-4 text-gray-400 truncate max-w-xs">{{ log.details }}</td>
+                        <td class="px-6 py-4 text-gray-200 font-medium">{{ log.action | replace('_', ' ') | title }}</td>
+                        <td class="px-6 py-4 text-gray-400 truncate max-w-xs" title="{{ log.details }}">{{ log.details }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">No audit logs found. Run a batch recovery first.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -79,10 +84,16 @@
         
         <!-- Pagination -->
         <div class="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
-            <div class="text-sm text-gray-400">Showing 1 to 20 of 100 entries</div>
+            <div class="text-sm text-gray-400">
+                Showing page {{ page }} of {{ total_pages }} ({{ total }} entries)
+            </div>
             <div class="flex space-x-2">
-                <button class="px-3 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-gray-400 hover:text-white disabled:opacity-50">Previous</button>
-                <button class="px-3 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-gray-400 hover:text-white">Next</button>
+                {% if page > 1 %}
+                <a href="/audit?page={{ page - 1 }}{% if filter_category != 'all' %}&category={{ filter_category }}{% endif %}{% if filter_actor != 'all' %}&actor={{ filter_actor }}{% endif %}{% if filter_workflow_id %}&workflow_id={{ filter_workflow_id }}{% endif %}" class="px-3 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-gray-400 hover:text-white">Previous</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="/audit?page={{ page + 1 }}{% if filter_category != 'all' %}&category={{ filter_category }}{% endif %}{% if filter_actor != 'all' %}&actor={{ filter_actor }}{% endif %}{% if filter_workflow_id %}&workflow_id={{ filter_workflow_id }}{% endif %}" class="px-3 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-gray-400 hover:text-white">Next</a>
+                {% endif %}
             </div>
         </div>
     </div>

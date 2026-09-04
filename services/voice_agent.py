@@ -121,44 +121,78 @@ You MUST respond strictly in valid JSON format with the following schema:
         messages = [{"role": "system", "content": self._build_system_prompt(state)}]
         for msg in state.conversation_history[-5:]: # Keep last 5 messages for context
             messages.append({"role": msg["role"], "content": msg["content"]})
-            
-        try:
-            completion = await self.groq_client.chat.completions.create(
-                model=settings.groq_llm_model,
-                messages=messages,
-                temperature=0.7,
-                response_format={"type": "json_object"}
-            )
-            
-            response_data = json.loads(completion.choices[0].message.content)
-            
-            state.customer_intent = response_data.get("detected_intent")
-            if response_data.get("promise_date"):
-                try:
-                    state.promise_date = datetime.strptime(response_data.get("promise_date"), "%Y-%m-%d")
-                except ValueError:
-                    pass
-                    
-            if response_data.get("should_end_call"):
-                state.call_ended = True
+        
+        response_text = None
+        
+        # Try Groq first (with one retry)
+        for attempt in range(2):
+            try:
+                completion = await self.groq_client.chat.completions.create(
+                    model=settings.groq_llm_model,
+                    messages=messages,
+                    temperature=0.7,
+                    response_format={"type": "json_object"}
+                )
                 
-            response_text = response_data.get("response_text", "Samajh nahi aaya, kripya dobara bataiye.")
-            state.conversation_history.append({"role": "assistant", "content": response_text})
-            return response_text
-            
-        except Exception as e:
-            logger.error(f"Error generating response: {e}")
-            return "Maaf kijiye, mujhe samajh nahi aaya."
+                response_data = json.loads(completion.choices[0].message.content)
+                
+                state.customer_intent = response_data.get("detected_intent")
+                if response_data.get("promise_date"):
+                    try:
+                        state.promise_date = datetime.strptime(response_data.get("promise_date"), "%Y-%m-%d")
+                    except ValueError:
+                        pass
+                        
+                if response_data.get("should_end_call"):
+                    state.call_ended = True
+                    
+                response_text = response_data.get("response_text", "Samajh nahi aaya, kripya dobara bataiye.")
+                break
+                
+            except Exception as e:
+                logger.warning(f"Groq attempt {attempt + 1} failed: {e}")
+                if attempt == 0:
+                    import asyncio
+                    await asyncio.sleep(1.0)
+        
+        # Fallback to Gemini if Groq failed
+        if response_text is None and settings.has_gemini:
+            try:
+                from google import genai
+                client = genai.Client(api_key=settings.gemini_api_key)
+                prompt = f"{self._build_system_prompt(state)}\n\nUser said: {user_text}\n\nRespond in the JSON format specified."
+                result = client.models.generate_content(
+                    model=settings.gemini_model,
+                    contents=prompt,
+                )
+                response_data = json.loads(result.text)
+                response_text = response_data.get("response_text", "Samajh nahi aaya.")
+                state.customer_intent = response_data.get("detected_intent")
+                if response_data.get("should_end_call"):
+                    state.call_ended = True
+                logger.info("Gemini fallback succeeded for voice agent.")
+            except Exception as e2:
+                logger.error(f"Gemini fallback also failed: {e2}")
+        
+        if response_text is None:
+            response_text = "Maaf kijiye, thoda technical issue aa raha hai. Kya aap thodi der baad try kar sakte hain?"
+        
+        state.conversation_history.append({"role": "assistant", "content": response_text})
+        return response_text
 
     async def synthesize_speech(self, text: str) -> bytes:
         """Convert text to speech using Edge TTS (Hindi voice)."""
-        voice = getattr(settings, "voice_tts_voice_hindi", "hi-IN-MadhurNeural")
-        communicate = edge_tts.Communicate(text, voice)
-        audio_data = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk['type'] == 'audio':
-                audio_data.write(chunk['data'])
-        return audio_data.getvalue()
+        try:
+            voice = getattr(settings, "voice_tts_voice_hindi", "hi-IN-MadhurNeural")
+            communicate = edge_tts.Communicate(text, voice)
+            audio_data = io.BytesIO()
+            async for chunk in communicate.stream():
+                if chunk['type'] == 'audio':
+                    audio_data.write(chunk['data'])
+            return audio_data.getvalue()
+        except Exception as e:
+            logger.error(f"TTS synthesis failed: {e}")
+            return b""
 
     async def extract_intent(self, state: ConversationState) -> str:
         """Extract customer intent from conversation history."""
