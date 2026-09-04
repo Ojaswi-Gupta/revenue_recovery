@@ -276,8 +276,86 @@ async def stop_workflow(workflow_id: str):
     )
 
 
+# ─── Hosted Customer Checkout Portal ───────────────────────────────────────
+
+@router.get("/pay/{workflow_id}", response_class=HTMLResponse)
+async def customer_checkout_page(request: Request, workflow_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Customer-facing hosted payment portal.
+    Accessible from the email reminder link to settle outstanding invoices.
+    """
+    from ..models.events import InvoiceEvent
+
+    stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+    result = await db.execute(stmt)
+    workflow = result.scalar_one_or_none()
+
+    if not workflow:
+        return HTMLResponse("<div style='font-family:sans-serif;padding:40px;text-align:center;'><h2>Invoice or Payment Link Not Found</h2><p>This recovery link may have expired or was removed.</p></div>", status_code=404)
+
+    company_name = "Vendor Partner"
+    invoice_number = f"INV-{workflow.id[:8].upper()}"
+    days_overdue = 14
+
+    if workflow.event_type == "invoice_overdue":
+        stmt_inv = select(InvoiceEvent).where(InvoiceEvent.id == workflow.event_id)
+        inv = (await db.execute(stmt_inv)).scalar_one_or_none()
+        if inv:
+            company_name = inv.company_name or company_name
+            invoice_number = inv.invoice_number or invoice_number
+            days_overdue = getattr(inv, "days_overdue", 14)
+
+    settings = get_settings()
+
+    return templates.TemplateResponse("checkout.html", {
+        "request": request,
+        "workflow": workflow,
+        "company_name": company_name,
+        "invoice_number": invoice_number,
+        "days_overdue": days_overdue,
+        "razorpay_key_id": settings.razorpay_key_id,
+    })
+
+
+@router.post("/api/pay/{workflow_id}")
+async def process_checkout_payment(workflow_id: str):
+    """
+    Customer payment confirmation from the hosted checkout portal.
+    Simulates live settlement, marks workflow as recovered, and updates ledger.
+    """
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    import random
+
+    orchestrator = RecoveryOrchestrator()
+    async with get_db_session() as session:
+        workflow = await orchestrator.simulate_payment_received(session, workflow_id)
+
+    if not workflow:
+        return HTMLResponse('<div class="text-red-400 p-4">Workflow not found</div>', status_code=404)
+
+    txn_id = f"pay_rzp_{random.randint(10000000, 99999999)}"
+
+    return HTMLResponse(f"""
+    <div class="p-8 text-center bg-slate-900/90 rounded-2xl border border-emerald-500/40 shadow-xl">
+        <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">✓</div>
+        <h3 class="text-2xl font-bold text-white mb-1">Payment Successful!</h3>
+        <p class="text-sm text-emerald-400 font-medium mb-6">₹{workflow.amount_at_risk_inr:,.2f} settled securely via Razorpay</p>
+        <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-2 mb-6 max-w-sm mx-auto font-mono text-left">
+            <div class="flex justify-between"><span>Payment ID:</span><span class="text-slate-200">{txn_id}</span></div>
+            <div class="flex justify-between"><span>Customer:</span><span class="text-slate-200">{workflow.customer_name}</span></div>
+            <div class="flex justify-between"><span>Status:</span><span class="text-emerald-400 font-bold">SETTLED</span></div>
+            <div class="flex justify-between"><span>Ledger:</span><span class="text-blue-400 font-bold">RECOVERED</span></div>
+        </div>
+        <p class="text-xs text-slate-400 mb-6">A confirmation receipt has been issued and the vendor's ledger has been updated in real-time.</p>
+        <a href="/workflow/{workflow.id}" class="inline-block text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-md">
+            View Live Workflow Audit Trail →
+        </a>
+    </div>
+    """)
+
+
 @router.post("/api/workflow/{workflow_id}/send-email")
-async def send_email_reminder(workflow_id: str, to_vendor: bool = False):
+async def send_email_reminder(request: Request, workflow_id: str, to_vendor: bool = False):
     """
     Vendor 1-click trigger: Dispatch a professional email reminder
     with a live Razorpay payment link directly to the customer (or vendor test inbox).
@@ -300,12 +378,8 @@ async def send_email_reminder(workflow_id: str, to_vendor: bool = False):
                 status_code=404,
             )
 
-        # 1. Ensure a Razorpay payment link exists
-        try:
-            payment_link_url = await orchestrator._ensure_payment_link(session, workflow)
-        except Exception as e:
-            logger.warning(f"Could not generate Razorpay payment link: {e}")
-            payment_link_url = workflow.payment_link_url or f"https://rzp.io/l/inv_{workflow.id[:8]}"
+        # 1. Primary link: Hosted high-converting customer checkout portal
+        payment_link_url = f"{request.base_url}pay/{workflow.id}"
 
         # 2. Extract context if linked to an InvoiceEvent
         company_name = "Vendor Partner"

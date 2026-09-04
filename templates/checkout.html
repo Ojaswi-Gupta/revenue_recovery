@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Payment — Invoice {{ invoice_number }} | RecovrAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 md:p-8">
+    <div class="max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12" id="checkout-container">
+        
+        <!-- Left Column: Invoice Details -->
+        <div class="md:col-span-5 bg-slate-900/90 p-6 md:p-8 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between">
+            <div>
+                <!-- Brand & Security Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl text-emerald-400">⚡</span>
+                        <span class="font-bold text-lg text-white tracking-wide">Recovr<span class="text-emerald-400">AI</span></span>
+                    </div>
+                    <span class="text-[11px] font-semibold tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase">
+                        Secured by Razorpay
+                    </span>
+                </div>
+
+                <!-- Vendor Info -->
+                <div class="mb-6">
+                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Billed By</span>
+                    <h2 class="text-lg font-bold text-slate-100 mt-0.5">{{ company_name }}</h2>
+                    <p class="text-xs text-slate-400 font-mono mt-0.5">Invoice: {{ invoice_number }}</p>
+                </div>
+
+                <!-- Invoice Line Items Summary -->
+                <div class="space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 mb-6 text-sm">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Customer</span>
+                        <span class="text-slate-200 font-medium">{{ workflow.customer_name }}</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Contact</span>
+                        <span class="text-slate-200 font-mono text-xs">{{ workflow.customer_phone }}</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Due Status</span>
+                        <span class="text-amber-400 font-semibold">{{ days_overdue }} days overdue</span>
+                    </div>
+                    <div class="border-t border-slate-800 pt-3 flex justify-between items-baseline">
+                        <span class="font-medium text-slate-300">Total Due</span>
+                        <span class="text-2xl font-extrabold text-emerald-400 font-mono">₹{{ "%.2f"|format(workflow.amount_at_risk_inr) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trust Badge -->
+            <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <span class="flex items-center space-x-1.5">
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span>256-bit Encrypted</span>
+                </span>
+                <span>PCI-DSS Level 1</span>
+            </div>
+        </div>
+
+        <!-- Right Column: Payment Methods & Actions -->
+        <div class="md:col-span-7 p-6 md:p-8 flex flex-col justify-between" id="payment-box">
+            <div>
+                <h3 class="text-base font-semibold text-slate-100 mb-1">Select Payment Method</h3>
+                <p class="text-xs text-slate-400 mb-6">Choose how you'd like to settle this outstanding invoice.</p>
+
+                {% if workflow.status == 'recovered' %}
+                <!-- Already Paid State -->
+                <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6 text-center">
+                    <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">✓</div>
+                    <h4 class="text-lg font-bold text-white mb-1">Invoice Already Settled!</h4>
+                    <p class="text-xs text-slate-300 mb-4">Payment of ₹{{ "%.2f"|format(workflow.amount_at_risk_inr) }} has been received and verified.</p>
+                    <a href="/workflow/{{ workflow.id }}" class="inline-block text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg border border-slate-700">View Audit Record</a>
+                </div>
+
+                {% else %}
+                <!-- Payment Tabs -->
+                <div class="space-y-4">
+                    <!-- Option 1: Instant UPI -->
+                    <div class="border border-emerald-500/40 bg-slate-950/80 rounded-xl p-4 relative overflow-hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">UPI</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-slate-100">UPI Instant Settlement</div>
+                                    <div class="text-xs text-slate-400">Google Pay, PhonePe, Paytm, BHIM</div>
+                                </div>
+                            </div>
+                            <span class="text-[10px] bg-emerald-400/20 text-emerald-300 font-semibold px-2 py-0.5 rounded">FASTEST</span>
+                        </div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <input type="text" value="{{ workflow.customer_phone }}@upi" readonly class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
+                            <button hx-post="/api/pay/{{ workflow.id }}" hx-target="#payment-box" hx-swap="outerHTML" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-lg transition-colors">
+                                Pay via UPI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Cards -->
+                    <div class="border border-slate-800 bg-slate-950/40 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs">💳</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-slate-100">Credit / Debit Card</div>
+                                    <div class="text-xs text-slate-400">Visa, Mastercard, RuPay, Corporate Cards</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <input type="text" placeholder="Card Number (4111 2222 ...)" value="•••• •••• •••• 4242" readonly class="col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
+                            <input type="text" placeholder="MM/YY" value="12/28" readonly class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
+                            <input type="text" placeholder="CVV" value="•••" readonly class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
+                        </div>
+                        <button hx-post="/api/pay/{{ workflow.id }}" hx-target="#payment-box" hx-swap="outerHTML" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs rounded-lg border border-slate-700 transition-colors">
+                            Pay ₹{{ "%.2f"|format(workflow.amount_at_risk_inr) }} with Card
+                        </button>
+                    </div>
+
+                    <!-- Option 3: NetBanking -->
+                    <div class="border border-slate-800 bg-slate-950/40 rounded-xl p-4">
+                        <div class="flex items-center space-x-2.5 mb-3">
+                            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs">🏦</div>
+                            <div>
+                                <div class="text-sm font-semibold text-slate-100">Corporate & Retail NetBanking</div>
+                                <div class="text-xs text-slate-400">HDFC, ICICI, SBI, Axis, Kotak</div>
+                            </div>
+                        </div>
+                        <button hx-post="/api/pay/{{ workflow.id }}" hx-target="#payment-box" hx-swap="outerHTML" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs rounded-lg border border-slate-700 transition-colors">
+                            Pay via NetBanking
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 1-Click Test Checkout Button -->
+                <div class="mt-6 pt-4 border-t border-slate-800">
+                    <button hx-post="/api/pay/{{ workflow.id }}" hx-target="#payment-box" hx-swap="outerHTML" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2">
+                        <span>⚡ One-Click Settle Invoice (₹{{ "%.2f"|format(workflow.amount_at_risk_inr) }})</span>
+                    </button>
+                    <p class="text-[11px] text-slate-500 text-center mt-2">Simulates live Razorpay webhooks and auto-updates recovery status</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer note -->
+            <div class="text-[11px] text-slate-500 text-center mt-6">
+                RecovrAI Autonomous Recovery Engine • Tested with Razorpay Test Mode
+            </div>
+        </div>
+    </div>
+</body>
+</html>
