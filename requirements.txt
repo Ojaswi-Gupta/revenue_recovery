@@ -22,7 +22,7 @@ google-genai==1.18.0
 openai==1.82.0
 
 # === Voice ===
-edge-tts==6.1.19
+edge-tts==7.2.8
 webrtcvad-wheels==2.0.14
 
 # === Configuration ===
