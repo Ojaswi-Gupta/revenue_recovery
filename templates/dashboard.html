@@ -118,20 +118,23 @@
                         <td class="px-6 py-4 text-xs">{{ w.root_cause or '—' }}</td>
                         <td class="px-6 py-4 text-xs">{{ w.current_channel or '—' }}</td>
                         <td class="px-6 py-4">
-                            {% if not w.is_terminal %}
-                            <div class="flex items-center space-x-2">
+                            {% if w.status != 'recovered' %}
+                            <div class="flex items-center space-x-2 whitespace-nowrap">
                                 <button hx-post="/api/workflow/{{ w.id }}/send-email" hx-target="#action-result" hx-swap="innerHTML"
-                                        class="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline flex items-center" title="Send email reminder">
+                                        class="px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded text-xs font-medium border border-blue-500/30 transition-colors" title="Send reminder to customer">
                                     ✉️ Remind
                                 </button>
-                                <span class="text-gray-600">|</span>
+                                <button hx-post="/api/workflow/{{ w.id }}/send-email?to_vendor=true" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="px-2 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 rounded text-xs font-medium border border-indigo-500/30 transition-colors" title="Send test preview directly to your own configured Gmail">
+                                    📬 Test to Me
+                                </button>
                                 <button hx-post="/api/simulate-recovery/{{ w.id }}" hx-target="#action-result" hx-swap="innerHTML"
                                         class="text-xs text-emerald-400 hover:text-emerald-300 underline">
-                                    Simulate Pay
+                                    Pay
                                 </button>
                             </div>
                             {% else %}
-                            <span class="text-xs text-gray-600">—</span>
+                            <span class="text-xs text-emerald-500 font-medium">✓ Settled</span>
                             {% endif %}
                         </td>
                     </tr>
