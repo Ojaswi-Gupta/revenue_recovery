@@ -395,37 +395,49 @@ class RecoveryOrchestrator:
         return action
 
     async def _ensure_payment_link(
-        self, session: AsyncSession, workflow: RecoveryWorkflow
+        self, session: AsyncSession, workflow: RecoveryWorkflow, create_on_razorpay: bool = False
     ) -> str:
-        """Ensure a payment link exists for the workflow, creating one if needed."""
-        if workflow.payment_link_url:
+        """
+        Ensure a payment link exists for the workflow.
+        If create_on_razorpay=False (default for batch runs), assigns the hosted checkout portal URL
+        to preserve the 30-link Razorpay test quota.
+        If create_on_razorpay=True, generates an official Razorpay short link on-demand.
+        """
+        if workflow.payment_link_url and (not create_on_razorpay or workflow.payment_link_id):
             return workflow.payment_link_url
 
-        link = self.razorpay_client.create_payment_link(
-            amount=workflow.amount_at_risk,
-            customer_name=workflow.customer_name,
-            customer_email=workflow.customer_email,
-            customer_phone=workflow.customer_phone,
-            description=f"Recovery payment for {workflow.event_type}",
-            notes={"workflow_id": workflow.id, "event_type": workflow.event_type},
-        )
+        if create_on_razorpay:
+            try:
+                link = self.razorpay_client.create_payment_link(
+                    amount=workflow.amount_at_risk,
+                    customer_name=workflow.customer_name,
+                    customer_email=workflow.customer_email,
+                    customer_phone=workflow.customer_phone,
+                    description=f"Recovery payment for {workflow.event_type}",
+                    notes={"workflow_id": workflow.id, "event_type": workflow.event_type},
+                )
+                workflow.payment_link_id = link["id"]
+                workflow.payment_link_url = link.get("short_url", f"https://rzp.io/i/{link['id']}")
 
-        workflow.payment_link_id = link["id"]
-        workflow.payment_link_url = link.get("short_url", f"https://rzp.io/i/{link['id']}")
+                audit = AuditLog(
+                    id=str(uuid.uuid4()),
+                    workflow_id=workflow.id,
+                    action="payment_link_created",
+                    actor="orchestrator",
+                    category="action",
+                    details=(
+                        f"Official Razorpay payment link created: {workflow.payment_link_url} "
+                        f"for ₹{workflow.amount_at_risk_inr:.2f}"
+                    ),
+                )
+                session.add(audit)
+                return workflow.payment_link_url
 
-        audit = AuditLog(
-            id=str(uuid.uuid4()),
-            workflow_id=workflow.id,
-            action="payment_link_created",
-            actor="orchestrator",
-            category="action",
-            details=(
-                f"Payment link created: {workflow.payment_link_url} "
-                f"for ₹{workflow.amount_at_risk_inr:.2f}"
-            ),
-        )
-        session.add(audit)
+            except Exception as e:
+                logger.warning(f"Could not create Razorpay link ({e}). Falling back to hosted checkout portal.")
 
+        # Fallback / Batch default: Hosted RecovrAI Checkout Portal (preserves Razorpay quota)
+        workflow.payment_link_url = f"/pay/{workflow.id}"
         return workflow.payment_link_url
 
     async def _escalate_workflow(
