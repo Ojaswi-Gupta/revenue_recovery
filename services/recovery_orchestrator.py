@@ -561,6 +561,9 @@ class RecoveryOrchestrator:
                         "error": str(e),
                     })
 
+                # Throttle to respect free-tier API rate limits (Razorpay, Groq)
+                await asyncio.sleep(0.5)
+
         # Save batch metrics
         await self._save_batch_metrics(session, batch_id, results)
 
