@@ -104,10 +104,11 @@ class NotificationService:
         subject: str,
         body: str,
         workflow_id: str,
+        html_body: Optional[str] = None,
     ) -> RecoveryAction:
         """
         Send a recovery email to the customer.
-        In demo mode, logs to console.
+        Uses real SMTP if configured; otherwise logs to console (demo mode).
         """
         action = RecoveryAction(
             id=str(uuid.uuid4()),
@@ -118,29 +119,71 @@ class NotificationService:
             request_payload=json.dumps({
                 "email": email,
                 "subject": subject,
-                "body": body[:200],
+                "body_preview": body[:150],
+                "has_html": bool(html_body),
             }),
         )
 
         try:
-            # Demo mode — always log to console
-            logger.info(
-                f"[DEMO EMAIL] To: {email}\n"
-                f"  Subject: {subject}\n"
-                f"  Body: {body[:100]}..."
-            )
-            action.status = "success"
-            action.response_payload = json.dumps({
-                "demo": True,
-                "message": "Email logged to console (demo mode)",
-            })
+            if self.settings.has_smtp:
+                import asyncio
+                import smtplib
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+
+                def _send_sync():
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = subject
+                    from_display = f"{self.settings.smtp_from_name} <{self.settings.smtp_from_email}>"
+                    msg["From"] = from_display
+                    msg["To"] = email
+
+                    # Plain text fallback
+                    msg.attach(MIMEText(body, "plain", "utf-8"))
+                    # HTML body if provided
+                    if html_body:
+                        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+                    with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=10) as server:
+                        if self.settings.smtp_use_tls:
+                            server.starttls()
+                        server.login(self.settings.smtp_user, self.settings.smtp_password)
+                        server.sendmail(self.settings.smtp_from_email, [email], msg.as_string())
+
+                await asyncio.to_thread(_send_sync)
+                action.status = "success"
+                action.response_payload = json.dumps({
+                    "smtp": True,
+                    "to": email,
+                    "subject": subject,
+                    "host": self.settings.smtp_host,
+                    "sent_at": datetime.utcnow().isoformat(),
+                })
+                logger.info(f"Email sent via SMTP to {email}: '{subject}'")
+
+            else:
+                # Demo mode — log to console
+                logger.info(
+                    f"[DEMO EMAIL] To: {email}\n"
+                    f"  Subject: {subject}\n"
+                    f"  Body: {body[:150]}..."
+                )
+                action.status = "success"
+                action.response_payload = json.dumps({
+                    "demo": True,
+                    "to": email,
+                    "subject": subject,
+                    "message": "Email logged to console (demo mode — configure SMTP in .env for live dispatch)",
+                    "simulated_at": datetime.utcnow().isoformat(),
+                })
+
             action.completed_at = datetime.utcnow()
 
         except Exception as e:
             action.status = "failed"
             action.error_message = str(e)
             action.completed_at = datetime.utcnow()
-            logger.error(f"Email failed to {email}: {e}")
+            logger.error(f"Email delivery failed to {email}: {e}")
 
         return action
 
@@ -254,6 +297,107 @@ Best regards,
 RecovrAI Automated Recovery System
 """
         return subject, body
+
+    def build_invoice_html_email(
+        self,
+        customer_name: str,
+        company_name: str,
+        invoice_number: str,
+        amount_due_inr: float,
+        days_overdue: int,
+        payment_link_url: str,
+    ) -> tuple[str, str, str]:
+        """
+        Build an enterprise-grade HTML invoice reminder email.
+        Returns (subject, plain_text, html_body).
+        """
+        subject, plain_text = self.build_invoice_reminder_email(
+            customer_name=customer_name,
+            company_name=company_name,
+            invoice_number=invoice_number,
+            amount_due_inr=amount_due_inr,
+            days_overdue=days_overdue,
+            payment_link_url=payment_link_url,
+        )
+
+        urgency_color = "#dc2626" if days_overdue > 30 else "#f59e0b"
+        urgency_label = f"OVERDUE BY {days_overdue} DAYS" if days_overdue > 0 else "PAYMENT DUE"
+
+        html_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{subject}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 32px 16px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <!-- Header Banner -->
+        <div style="background-color: #0f172a; padding: 24px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #10b981;">⚡ RecovrAI</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">Automated Accounts Receivable</p>
+            </div>
+            <span style="display: inline-block; background-color: {urgency_color}20; color: {urgency_color}; border: 1px solid {urgency_color}50; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                {urgency_label}
+            </span>
+        </div>
+
+        <!-- Body Content -->
+        <div style="padding: 32px 24px;">
+            <p style="font-size: 16px; margin: 0 0 16px; color: #e2e8f0;">Dear <strong>{customer_name}</strong>,</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 0 0 24px;">
+                This is an official notice regarding outstanding invoice <strong>{invoice_number}</strong> issued by <strong>{company_name}</strong>. Our records indicate this balance is currently unpaid.
+            </p>
+
+            <!-- Invoice Summary Box -->
+            <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 20px; margin-bottom: 28px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                        <td style="padding: 6px 0; color: #94a3b8;">Invoice Number:</td>
+                        <td style="padding: 6px 0; font-weight: 600; color: #f8fafc; text-align: right; font-family: monospace;">{invoice_number}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #94a3b8;">Vendor / Billed By:</td>
+                        <td style="padding: 6px 0; font-weight: 600; color: #f8fafc; text-align: right;">{company_name}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #94a3b8;">Days Overdue:</td>
+                        <td style="padding: 6px 0; font-weight: 700; color: {urgency_color}; text-align: right;">{days_overdue} days</td>
+                    </tr>
+                    <tr style="border-top: 1px solid #334155;">
+                        <td style="padding: 12px 0 0; font-size: 16px; font-weight: 600; color: #f8fafc;">Total Amount Due:</td>
+                        <td style="padding: 12px 0 0; font-size: 22px; font-weight: 800; color: #10b981; text-align: right;">₹{amount_due_inr:,.2f}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin-bottom: 28px;">
+                <a href="{payment_link_url}" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 14px 36px; border-radius: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);">
+                    Pay ₹{amount_due_inr:,.2f} Securely via Razorpay →
+                </a>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0 0 16px;">
+                Or copy and paste this link into your browser:<br>
+                <a href="{payment_link_url}" style="color: #38bdf8; word-break: break-all;">{payment_link_url}</a>
+            </p>
+
+            <div style="border-top: 1px solid #334155; padding-top: 20px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                <p style="margin: 0 0 8px;">• If you have already settled this invoice, please disregard this reminder.</p>
+                <p style="margin: 0;">• For billing disputes or payment arrangement requests, reply directly to this email.</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #0f172a; padding: 16px 24px; border-top: 1px solid #334155; text-align: center; font-size: 11px; color: #64748b;">
+            Sent by RecovrAI Autonomous Recovery Agent on behalf of {company_name}. Fully audited & compliance-verified.
+        </div>
+    </div>
+</body>
+</html>"""
+        return subject, plain_text, html_body
 
     def build_subscription_recovery_sms(
         self,

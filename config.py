@@ -131,6 +131,15 @@ class Settings(BaseSettings):
     subscription_retry_delay_hours: int = 24
     invoice_reminder_interval_days: int = 3
 
+    # === SMTP Email Configuration ===
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "recovery@recovrai.com"
+    smtp_from_name: str = "RecovrAI Accounts Receivable"
+    smtp_use_tls: bool = True
+
     # === Voice Agent ===
     voice_tts_voice_hindi: str = "hi-IN-SwaraNeural"
     voice_tts_voice_english: str = "en-IN-NeerjaNeural"
@@ -156,6 +165,11 @@ class Settings(BaseSettings):
     def has_gemini(self) -> bool:
         """Check if Gemini API key is configured."""
         return bool(self.gemini_api_key) and not self.gemini_api_key.startswith("XXXX")
+
+    @property
+    def has_smtp(self) -> bool:
+        """Check if SMTP email credentials are configured."""
+        return bool(self.smtp_host and self.smtp_user and self.smtp_password)
 
 
 @lru_cache()

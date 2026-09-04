@@ -119,10 +119,17 @@
                         <td class="px-6 py-4 text-xs">{{ w.current_channel or '—' }}</td>
                         <td class="px-6 py-4">
                             {% if not w.is_terminal %}
-                            <button hx-post="/api/simulate-recovery/{{ w.id }}" hx-target="#action-result" hx-swap="innerHTML"
-                                    class="text-xs text-emerald-400 hover:text-emerald-300 underline">
-                                Simulate Pay
-                            </button>
+                            <div class="flex items-center space-x-2">
+                                <button hx-post="/api/workflow/{{ w.id }}/send-email" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline flex items-center" title="Send email reminder">
+                                    ✉️ Remind
+                                </button>
+                                <span class="text-gray-600">|</span>
+                                <button hx-post="/api/simulate-recovery/{{ w.id }}" hx-target="#action-result" hx-swap="innerHTML"
+                                        class="text-xs text-emerald-400 hover:text-emerald-300 underline">
+                                    Simulate Pay
+                                </button>
+                            </div>
                             {% else %}
                             <span class="text-xs text-gray-600">—</span>
                             {% endif %}

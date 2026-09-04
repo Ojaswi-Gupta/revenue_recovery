@@ -24,10 +24,11 @@
             </div>
         </div>
         {% if not workflow.is_terminal %}
-        <div class="flex space-x-3">
-            <button hx-post="/api/simulate-recovery/{{ workflow.id }}" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors">Simulate Payment</button>
-            <button hx-post="/api/workflow/{{ workflow.id }}/escalate" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-colors">Escalate</button>
-            <button hx-post="/api/workflow/{{ workflow.id }}/stop" hx-target="#action-feedback" hx-swap="innerHTML" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-md text-sm font-medium transition-colors">Stop</button>
+        <div class="flex flex-wrap gap-2">
+            <button hx-post="/api/workflow/{{ workflow.id }}/send-email" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">✉️ Send Email Reminder</button>
+            <button hx-post="/api/simulate-recovery/{{ workflow.id }}" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Simulate Payment</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/escalate" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Escalate</button>
+            <button hx-post="/api/workflow/{{ workflow.id }}/stop" hx-target="#action-feedback" hx-swap="innerHTML" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white rounded-md text-sm font-medium transition-colors shadow-sm">Stop</button>
         </div>
         {% endif %}
     </div>

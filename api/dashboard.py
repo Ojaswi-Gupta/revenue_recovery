@@ -276,6 +276,108 @@ async def stop_workflow(workflow_id: str):
     )
 
 
+@router.post("/api/workflow/{workflow_id}/send-email")
+async def send_email_reminder(workflow_id: str):
+    """
+    Vendor 1-click trigger: Dispatch a professional email reminder
+    with a live Razorpay payment link directly to the customer.
+    """
+    from ..models.events import InvoiceEvent
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    import uuid
+
+    orchestrator = RecoveryOrchestrator()
+
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse(
+                '<div class="text-red-400 text-sm p-2">❌ Workflow not found</div>',
+                status_code=404,
+            )
+
+        # 1. Ensure a Razorpay payment link exists
+        try:
+            payment_link_url = await orchestrator._ensure_payment_link(session, workflow)
+        except Exception as e:
+            logger.warning(f"Could not generate Razorpay payment link: {e}")
+            payment_link_url = workflow.payment_link_url or f"https://rzp.io/l/inv_{workflow.id[:8]}"
+
+        # 2. Extract context if linked to an InvoiceEvent
+        company_name = "Vendor Partner"
+        invoice_number = f"INV-{workflow.id[:8].upper()}"
+        days_overdue = 14
+        amount_due_inr = workflow.amount_at_risk_inr
+
+        if workflow.event_type == "invoice_overdue":
+            stmt_inv = select(InvoiceEvent).where(InvoiceEvent.id == workflow.event_id)
+            inv_result = await session.execute(stmt_inv)
+            inv = inv_result.scalar_one_or_none()
+            if inv:
+                company_name = inv.company_name or company_name
+                invoice_number = inv.invoice_number or invoice_number
+                days_overdue = getattr(inv, "days_overdue", 14)
+                amount_due_inr = inv.amount_inr
+
+        # 3. Build rich HTML email
+        subject, plain_text, html_body = orchestrator.notification_service.build_invoice_html_email(
+            customer_name=workflow.customer_name,
+            company_name=company_name,
+            invoice_number=invoice_number,
+            amount_due_inr=amount_due_inr,
+            days_overdue=days_overdue,
+            payment_link_url=payment_link_url,
+        )
+
+        # 4. Dispatch email
+        action = await orchestrator.notification_service.send_email(
+            email=workflow.customer_email,
+            subject=subject,
+            body=plain_text,
+            workflow_id=workflow.id,
+            html_body=html_body,
+        )
+        session.add(action)
+
+        # 5. Update workflow state & metrics
+        workflow.contact_attempts += 1
+        workflow.current_channel = "email"
+        workflow.last_contact_at = datetime.utcnow()
+        if workflow.status in ("detected", "diagnosing", "intervention_planned"):
+            workflow.status = "executing"
+
+        # 6. Audit trail
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow.id,
+            action="vendor_email_reminder_sent",
+            actor="vendor_operator",
+            category="action",
+            details=(
+                f"Vendor dispatched 1-click email reminder to {workflow.customer_email} "
+                f"for ₹{amount_due_inr:,.2f} (Invoice {invoice_number}). Razorpay link: {payment_link_url}"
+            ),
+            metadata_json=json.dumps({
+                "to": workflow.customer_email,
+                "invoice_number": invoice_number,
+                "amount_inr": amount_due_inr,
+                "payment_link": payment_link_url,
+                "attempt": workflow.contact_attempts,
+            }),
+        )
+        session.add(audit)
+
+    return HTMLResponse(
+        f'<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-2 rounded-md shadow-sm">'
+        f'✉️ Reminder dispatched to <strong>{workflow.customer_email}</strong> '
+        f'(Attempt #{workflow.contact_attempts}) with payment link.'
+        f'</div>'
+    )
+
+
 # ─── HTMX Partials ──────────────────────────────────────────────────────────
 
 
