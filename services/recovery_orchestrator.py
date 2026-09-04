@@ -78,6 +78,11 @@ class RecoveryOrchestrator:
             amount_at_risk=amount_at_risk,
             currency="INR",
             created_at=datetime.utcnow(),
+            amount_recovered=0,
+            contact_attempts=0,
+            promise_fulfilled=False,
+            confidence=0.0,
+            urgency="medium",
         )
         session.add(workflow)
 
