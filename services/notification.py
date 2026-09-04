@@ -237,6 +237,68 @@ class NotificationService:
 
         return action
 
+    async def make_voice_call(
+        self,
+        phone: str,
+        message: str,
+        workflow_id: str,
+    ) -> RecoveryAction:
+        """
+        Initiate an outbound PSTN phone call via Twilio with Hindi/Indian TTS.
+        Falls back to console demo mode if Twilio is not configured.
+        """
+        action = RecoveryAction(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow_id,
+            action_type="voice_call",
+            channel=RecoveryChannel.VOICE_CALL.value,
+            status="executing",
+            request_payload=json.dumps({"phone": phone, "message": message}),
+        )
+
+        try:
+            if self._twilio_client:
+                import asyncio
+                twiml = f"""<Response>
+                    <Say voice="Polly.Aditi" language="hi-IN">{message}</Say>
+                    <Pause length="1"/>
+                    <Say voice="Polly.Aditi" language="hi-IN">Kripya apna payment link check karein aur payment complete karein. Dhanyawad.</Say>
+                </Response>"""
+
+                def _call_sync():
+                    return self._twilio_client.calls.create(
+                        to=phone,
+                        from_=self.settings.twilio_phone_number,
+                        twiml=twiml,
+                    )
+
+                call = await asyncio.to_thread(_call_sync)
+                action.status = "success"
+                action.response_payload = json.dumps({
+                    "sid": call.sid,
+                    "status": call.status,
+                    "to": phone,
+                })
+                logger.info(f"Twilio Voice call dispatched to {phone}: SID={call.sid}")
+            else:
+                logger.info(f"[DEMO CALL] To: {phone}\n  Spoken Text: {message}")
+                action.status = "success"
+                action.response_payload = json.dumps({
+                    "demo": True,
+                    "message": "Voice call logged to console (demo mode)",
+                })
+
+            action.completed_at = datetime.utcnow()
+
+        except Exception as e:
+            action.status = "failed"
+            action.error_message = str(e)
+            action.completed_at = datetime.utcnow()
+            logger.error(f"Voice call failed to {phone}: {e}")
+
+        return action
+
+
     def build_recovery_sms(
         self,
         customer_name: str,

@@ -467,7 +467,69 @@ async def send_email_reminder(request: Request, workflow_id: str, to_vendor: boo
     )
 
 
+@router.post("/api/workflow/{workflow_id}/call")
+async def trigger_voice_call(workflow_id: str, to_verified: bool = False):
+    """
+    Trigger an automated outbound voice call via Twilio.
+    If to_verified=True, dials the developer's verified phone number (+917991924011).
+    """
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    import uuid
+
+    orchestrator = RecoveryOrchestrator()
+
+    async with get_db_session() as session:
+        stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+        result = await session.execute(stmt)
+        workflow = result.scalar_one_or_none()
+
+        if not workflow:
+            return HTMLResponse('<div class="text-red-400 text-xs p-2">Workflow not found</div>', status_code=404)
+
+        target_phone = "+917991924011" if to_verified else workflow.customer_phone
+        spoken_message = (
+            f"Namaste {workflow.customer_name} ji. Yeh RecovrAI se automated revenue recovery call hai. "
+            f"Aapka {workflow.event_type.replace('_', ' ')} ka payment of rupees {int(workflow.amount_at_risk_inr)} abhi tak process nahi ho paya tha."
+        )
+
+        action = await orchestrator.notification_service.make_voice_call(
+            phone=target_phone,
+            message=spoken_message,
+            workflow_id=workflow.id,
+        )
+        session.add(action)
+
+        workflow.contact_attempts += 1
+        workflow.current_channel = "voice_call"
+        workflow.last_contact_at = datetime.utcnow()
+
+        audit = AuditLog(
+            id=str(uuid.uuid4()),
+            workflow_id=workflow.id,
+            action="twilio_voice_call_dispatched",
+            actor="vendor_operator",
+            category="action",
+            details=f"Twilio Voice call placed to {target_phone} for workflow {workflow.id[:8]}",
+            metadata_json=json.dumps({"to": target_phone, "status": action.status}),
+        )
+        session.add(audit)
+
+    if action.status == "failed":
+        return HTMLResponse(
+            f'<div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md shadow-sm">'
+            f'❌ Call failed: {action.error_message}'
+            f'</div>'
+        )
+
+    return HTMLResponse(
+        f'<div class="bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs px-3 py-2 rounded-md shadow-sm">'
+        f'📞 Twilio voice call ringing <strong>{target_phone}</strong>!'
+        f'</div>'
+    )
+
+
 # ─── HTMX Partials ──────────────────────────────────────────────────────────
+
 
 
 @router.get("/partials/workflows-table")
