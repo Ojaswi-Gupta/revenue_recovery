@@ -37,11 +37,13 @@ async def dashboard_home(request: Request, db: AsyncSession = Depends(get_db)):
     """Main dashboard page with overview stats and recent workflows."""
     stats = await _get_dashboard_stats(db)
     workflows = await _get_recent_workflows(db, limit=25)
+    channel_stats = await _get_channel_stats(db)
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
         "workflows": workflows,
+        "channel_stats": channel_stats,
     })
 
 

@@ -58,6 +58,66 @@
         </a>
         <div id="action-result" class="ml-4"></div>
     </div>
+    
+    <!-- Channel ROI & Recovery Analytics Chart -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm p-6 mb-6">
+        <h2 class="text-lg font-medium text-white mb-4">Channel ROI & Recovery Conversion Rate</h2>
+        <div class="w-full h-64">
+            <canvas id="roiChart"></canvas>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('roiChart').getContext('2d');
+            const rawStats = {{ channel_stats | tojson | safe }};
+            
+            const labels = rawStats.map(stat => stat.channel.toUpperCase());
+            const data = rawStats.map(stat => stat.success_rate);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Success Rate (%)',
+                        data: data,
+                        backgroundColor: 'rgba(16, 185, 129, 0.6)', // Emerald
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.raw + '% Conversion';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 
     <!-- Workflows Table -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
