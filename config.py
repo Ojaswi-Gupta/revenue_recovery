@@ -114,14 +114,12 @@ class Settings(BaseSettings):
     razorpay_max_rpm: int = 20
     gemini_max_rpm: int = 12     # Leave 3 RPM headroom from 15 limit
 
-    # === Channel Escalation Order ===
     @property
     def escalation_ladder(self) -> list[RecoveryChannel]:
         return [
-            RecoveryChannel.PAYMENT_LINK,
-            RecoveryChannel.SMS,
             RecoveryChannel.EMAIL,
             RecoveryChannel.WHATSAPP,
+            RecoveryChannel.SMS,
             RecoveryChannel.VOICE_CALL,
             RecoveryChannel.HUMAN_ESCALATION,
         ]

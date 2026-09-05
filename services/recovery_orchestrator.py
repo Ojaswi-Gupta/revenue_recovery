@@ -260,8 +260,18 @@ class RecoveryOrchestrator:
                 # For notifications, set to executing and schedule follow-up
                 next_channel = self.compliance_engine.get_next_channel(workflow)
                 if next_channel:
+                    delay_minutes = 240 # Default 4 hours
+                    if next_channel == RecoveryChannel.WHATSAPP:
+                        delay_minutes = 4 * 60    # Hour 4
+                    elif next_channel == RecoveryChannel.SMS:
+                        delay_minutes = 44 * 60   # Day 2
+                    elif next_channel == RecoveryChannel.VOICE_CALL:
+                        delay_minutes = 24 * 60   # Day 3
+                    elif next_channel == RecoveryChannel.HUMAN_ESCALATION:
+                        delay_minutes = 48 * 60   # Day 5
+                        
                     workflow.next_action_at = self.compliance_engine.calculate_next_action_time(
-                        self.settings.cooldown_between_contacts_hours * 60
+                        delay_minutes
                     )
                     workflow.recommended_action = self._channel_to_action(next_channel)
                 else:
