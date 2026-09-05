@@ -20,7 +20,7 @@ from ..services.recovery_orchestrator import RecoveryOrchestrator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 razorpay_client = RazorpayClient()
 orchestrator = RecoveryOrchestrator()
 
@@ -106,7 +106,9 @@ async def _handle_payment_failed(entity: dict) -> None:
         session.add(event)
         workflow = await orchestrator.ingest_event(session, event)
         await orchestrator.diagnose_workflow(session, workflow, event)
-        logger.info(f"Payment failure processed → workflow {workflow.id[:8]}")
+        # Automatically trigger the first recovery action immediately (e.g., Email)
+        await orchestrator.execute_intervention(session, workflow)
+        logger.info(f"Payment failure processed and recovery started → workflow {workflow.id[:8]}")
 
 
 async def _handle_order_paid(entity: dict) -> None:
