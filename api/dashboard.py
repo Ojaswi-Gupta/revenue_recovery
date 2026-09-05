@@ -789,6 +789,118 @@ async def submit_promise(
     return HTMLResponse(content=html)
 
 
+@router.post("/api/test_real_link")
+async def test_real_link(db: AsyncSession = Depends(get_db)):
+    """Generate a single real Razorpay payment link to test the flow."""
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    orchestrator = RecoveryOrchestrator()
+    
+    event = PaymentEvent(
+        id=str(uuid.uuid4()),
+        payment_id=f"pay_{uuid.uuid4().hex[:14]}",
+        order_id="",
+        customer_id=f"cust_{uuid.uuid4().hex[:8]}",
+        customer_name="Test User",
+        customer_email="ojaswigupta317@gmail.com",
+        customer_phone="+917991924011",
+        amount=19900, # Rs. 199
+        currency="INR",
+        status="failed",
+        method="card",
+        error_code="BAD_REQUEST_ERROR",
+        error_description="Payment failed for testing real links",
+    )
+    
+    db.add(event)
+    workflow = await orchestrator.ingest_event(db, event)
+    await orchestrator.diagnose_workflow(db, workflow, event)
+    # create_on_razorpay=True is the default now!
+    workflow = await orchestrator.execute_intervention(db, workflow)
+    
+    await db.commit()
+    return HTMLResponse(
+        content=f"<div class='p-4 bg-emerald-900/50 text-emerald-400 rounded-lg'>✅ Triggered real Razorpay link generation. Check your email/WhatsApp!</div>"
+    )
+
+@router.post("/api/test_all_channels")
+async def test_all_channels(db: AsyncSession = Depends(get_db)):
+    """Generate a single real Razorpay payment link and immediately trigger Email, WhatsApp, and Voice."""
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    from ..services.notification import NotificationService
+    import asyncio
+    
+    orchestrator = RecoveryOrchestrator()
+    notification_service = NotificationService()
+    
+    event = PaymentEvent(
+        id=str(uuid.uuid4()),
+        payment_id=f"pay_{uuid.uuid4().hex[:14]}",
+        order_id="",
+        customer_id=f"cust_{uuid.uuid4().hex[:8]}",
+        customer_name="Test User",
+        customer_email="ojaswigupta317@gmail.com",
+        customer_phone="+917991924011",
+        amount=19900,
+        currency="INR",
+        status="failed",
+        method="card",
+        error_code="BAD_REQUEST_ERROR",
+        error_description="Testing all 3 channels instantly",
+    )
+    
+    db.add(event)
+    workflow = await orchestrator.ingest_event(db, event)
+    await orchestrator.diagnose_workflow(db, workflow, event)
+    # This generates the Razorpay link via _ensure_payment_link logic
+    workflow = await orchestrator.execute_intervention(db, workflow, create_on_razorpay=True)
+    await db.commit()
+    
+    # Send all 3 instantly to the vendor's test credentials
+    payment_link = workflow.payment_link_url or f"https://your-domain.com/pay/{workflow.id}"
+    
+    try:
+        # 1. Email
+        subject, body, html_body = notification_service.build_invoice_html_email(
+            customer_name="Test User",
+            company_name="Alfeus Tech",
+            invoice_number=f"INV-{uuid.uuid4().hex[:6].upper()}",
+            amount_due_inr=199.00,
+            days_overdue=0,
+            payment_link_url=payment_link,
+        )
+        await notification_service.send_email(
+            email="ojaswigupta317@gmail.com",
+            subject=subject,
+            body=body,
+            workflow_id=workflow.id,
+            html_body=html_body,
+        )
+        
+        # 2. WhatsApp
+        wa_msg = notification_service.build_recovery_sms("Test User", 199.0, payment_link)
+        await notification_service.send_whatsapp(
+            phone="+917991924011",
+            message=wa_msg,
+            workflow_id=workflow.id
+        )
+        
+        # 3. Voice
+        call_msg = "This is an automated call from Alfeus Tech regarding your failed payment of 199 rupees."
+        await notification_service.make_voice_call(
+            phone="+917991924011",
+            message=call_msg,
+            workflow_id=workflow.id,
+        )
+        
+        return HTMLResponse(
+            content=f"<div class='p-4 bg-emerald-900/50 text-emerald-400 rounded-lg border border-emerald-700 shadow-sm'>✅ Sent Email, WhatsApp, and Voice Call instantly! Check your phone and inbox.</div>"
+        )
+    except Exception as e:
+        logger.error(f"Failed to test all channels: {e}")
+        return HTMLResponse(
+            content=f"<div class='p-4 bg-red-900/50 text-red-400 rounded-lg border border-red-700 shadow-sm'>❌ Error: {str(e)}</div>"
+        )
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async def _get_dashboard_stats(db: AsyncSession) -> dict:

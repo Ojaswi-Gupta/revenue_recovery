@@ -178,7 +178,7 @@ class RecoveryOrchestrator:
     # ─── Execution Phase ──────────────────────────────────────────────────────
 
     async def execute_intervention(
-        self, session: AsyncSession, workflow: RecoveryWorkflow
+        self, session: AsyncSession, workflow: RecoveryWorkflow, create_on_razorpay: bool = True
     ) -> RecoveryWorkflow:
         """
         Execute the planned intervention for a workflow.
@@ -242,7 +242,7 @@ class RecoveryOrchestrator:
         # Execute the intervention
         workflow.status = WorkflowStatus.EXECUTING.value
 
-        action = await self._execute_action(session, workflow, channel)
+        action = await self._execute_action(session, workflow, channel, create_on_razorpay)
         session.add(action)
 
         # Update workflow state
@@ -298,11 +298,12 @@ class RecoveryOrchestrator:
         session: AsyncSession,
         workflow: RecoveryWorkflow,
         channel: RecoveryChannel,
+        create_on_razorpay: bool = True
     ) -> RecoveryAction:
         """Execute a specific recovery action based on channel."""
 
         # Generate a payment link first (needed for most channels)
-        payment_link_url = await self._ensure_payment_link(session, workflow)
+        payment_link_url = await self._ensure_payment_link(session, workflow, create_on_razorpay)
 
         if channel == RecoveryChannel.PAYMENT_LINK:
             action = RecoveryAction(
@@ -538,7 +539,7 @@ class RecoveryOrchestrator:
                 try:
                     workflow = await self.ingest_event(session, event)
                     workflow = await self.diagnose_workflow(session, workflow, event)
-                    workflow = await self.execute_intervention(session, workflow)
+                    workflow = await self.execute_intervention(session, workflow, create_on_razorpay=False)
 
                     # Simulate recovery for auto-retry successes
                     if (

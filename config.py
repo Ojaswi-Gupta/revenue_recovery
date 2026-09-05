@@ -81,8 +81,8 @@ class Settings(BaseSettings):
     razorpay_key_secret: str = ""
 
     # === Groq API (Free Tier) ===
-    groq_api_key: str = ""
-    groq_llm_model: str = "llama-3.1-8b-instant"
+    groq_api_key: Optional[str] = None
+    groq_llm_model: str = "mixtral-8x7b-32768"
     groq_whisper_model: str = "whisper-large-v3-turbo"
 
     # === Google Gemini API (Fallback) ===
@@ -119,7 +119,6 @@ class Settings(BaseSettings):
         return [
             RecoveryChannel.EMAIL,
             RecoveryChannel.WHATSAPP,
-            RecoveryChannel.SMS,
             RecoveryChannel.VOICE_CALL,
             RecoveryChannel.HUMAN_ESCALATION,
         ]

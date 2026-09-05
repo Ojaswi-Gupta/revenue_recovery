@@ -52,6 +52,15 @@
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
             🚀 Run Batch Recovery
         </button>
+        <button hx-post="/api/test_real_link" hx-target="#action-result" hx-swap="innerHTML"
+                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors">
+            🔗 Test Real Link
+        </button>
+        <button hx-post="/api/test_all_channels" hx-target="#action-result" hx-swap="innerHTML"
+                class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-md text-sm font-medium transition-colors"
+                title="Bypass time delays and instantly test Email, WhatsApp, and Voice Call right now">
+            🚀 Test All Channels Instantly
+        </button>
         <a href="/api/metrics/export/csv" 
            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white border border-gray-600 rounded-md text-sm font-medium transition-colors">
             📥 Export CSV
@@ -71,7 +80,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const ctx = document.getElementById('roiChart').getContext('2d');
-            const rawStats = {{ channel_stats | tojson | safe }};
+            const rawStats = {{ channel_stats | default([]) | tojson | safe }};
             
             const labels = rawStats.map(stat => stat.channel.toUpperCase());
             const data = rawStats.map(stat => stat.success_rate);
