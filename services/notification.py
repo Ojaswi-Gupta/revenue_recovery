@@ -278,12 +278,23 @@ class NotificationService:
                 import asyncio
                 # Interactive IVR using <Gather>
                 base_url = self.settings.app_base_url.rstrip("/") if self.settings.app_base_url else ""
-                callback_url = f"{base_url}/api/voice/twiml-callback?workflow_id={workflow_id}"
+                callback_url = f"{base_url}/api/voice/gather-callback?workflow_id={workflow_id}"
+                
+                # Fetch initial conversational greeting
+                from .voice_agent import VoiceAgent
+                import asyncio
+                agent = VoiceAgent()
+                
+                # We need to initialize the conversation state before making the call.
+                # It's better to let the webhook initialize it, but Twilio needs the initial TwiML right now.
+                # For simplicity, we will just say a standard greeting and wait for the user to speak.
+                initial_greeting = f"Namaste. {message} Aap ye payment kab tak kar sakte hain?"
+                
                 twiml = f"""<Response>
-                    <Gather action="{callback_url}" method="POST" numDigits="1" timeout="5">
-                        <Say voice="Polly.Kajal-Neural" language="en-IN">{message} Hello! Press 1 to get an instant payment link on WhatsApp. Press 2 to promise payment tomorrow. Press 3 to speak with our support agent.</Say>
+                    <Gather input="speech" action="{callback_url}" method="POST" language="hi-IN" speechTimeout="auto">
+                        <Say voice="Polly.Aditi" language="hi-IN">{initial_greeting}</Say>
                     </Gather>
-                    <Say voice="Polly.Kajal-Neural" language="en-IN">We didn't receive any input. Thank you for choosing RecovrAI. Have a great day.</Say>
+                    <Say voice="Polly.Aditi" language="hi-IN">Humein kuch sunayi nahi diya. Hum aapko WhatsApp par link bhej rahe hain. Dhanyawad.</Say>
                 </Response>"""
 
                 def _call_sync():

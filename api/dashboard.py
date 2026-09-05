@@ -495,10 +495,7 @@ async def trigger_voice_call(workflow_id: str, to_verified: bool = False, to_tes
         amount_val = int(workflow.amount_at_risk_inr)
         event_name = workflow.event_type.replace('_', ' ')
         spoken_message = (
-            f"Hello {first_name}. This is an automated courtesy reminder from RecovrAI regarding your {event_name}. "
-            f"Your pending payment of {amount_val} rupees could not be processed. "
-            f"We have sent a secure payment link directly to your mobile phone via SMS and WhatsApp. "
-            f"Please click the link to complete your payment at your earliest convenience."
+            f"Main Alfeus Tech se bol rahi hoon. Aapka {amount_val} rupees ka payment process nahi ho paya."
         )
 
         action = await orchestrator.notification_service.make_voice_call(
@@ -885,7 +882,7 @@ async def test_all_channels(db: AsyncSession = Depends(get_db)):
         )
         
         # 3. Voice
-        call_msg = "This is an automated call from Alfeus Tech regarding your failed payment of 199 rupees."
+        call_msg = "Main Alfeus Tech se bol rahi hoon. Aapka payment of 199 rupees process nahi ho paya."
         await notification_service.make_voice_call(
             phone="+917991924011",
             message=call_msg,
