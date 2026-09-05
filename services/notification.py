@@ -212,7 +212,9 @@ class NotificationService:
         try:
             if self._twilio_client:
                 import asyncio
-                wa_from = self.settings.twilio_whatsapp_number or ("whatsapp:" + self.settings.twilio_phone_number)
+                wa_from = self.settings.twilio_whatsapp_number or "whatsapp:+14155238886"
+                if not wa_from.startswith("whatsapp:"):
+                    wa_from = "whatsapp:" + wa_from
                 wa_to = phone if phone.startswith("whatsapp:") else ("whatsapp:" + phone)
                 def _send_wa_sync():
                     return self._twilio_client.messages.create(

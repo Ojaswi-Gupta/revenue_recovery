@@ -666,15 +666,25 @@ async def send_whatsapp_reminder(
 
     if action.status == "success":
         dispatch_badge = f'<span class="text-emerald-400 font-medium">✅ Twilio API Sent</span>'
+        hint = ""
     else:
-        dispatch_badge = f'<span class="text-amber-400 text-xs" title="{action.error_message}">⚠️ Twilio Sandbox Join Required</span>'
+        dispatch_badge = f'<span class="text-amber-400 font-medium">⚠️ Twilio Sandbox Join Required</span>'
+        hint = (
+            f'<div class="text-[11px] text-gray-300 mt-1.5 pt-1.5 border-t border-emerald-500/20">'
+            f'ℹ️ Meta requires a 1-time opt-in for Twilio WhatsApp test accounts. '
+            f'Click <strong>Open WhatsApp Chat</strong> on the right to test right away, or send your Twilio console join code to <code>+1 415 523 8886</code>.'
+            f'</div>'
+        )
 
     return HTMLResponse(
-        f'<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs px-3 py-2 rounded-md shadow-sm flex items-center justify-between gap-3">'
+        f'<div class="bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 text-xs px-3.5 py-2.5 rounded-lg shadow-md">'
+        f'<div class="flex items-center justify-between gap-3">'
         f'<div>📱 WhatsApp to <strong>{target_phone}</strong>: {dispatch_badge}</div>'
-        f'<a href="{wa_link}" target="_blank" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs shadow inline-flex items-center gap-1 transition-colors">'
+        f'<a href="{wa_link}" target="_blank" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs shadow inline-flex items-center gap-1 transition-colors whitespace-nowrap">'
         f'<span>💬 Open WhatsApp Chat</span> →'
         f'</a>'
+        f'</div>'
+        f'{hint}'
         f'</div>'
     )
 
