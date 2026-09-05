@@ -149,6 +149,26 @@
                     </button>
                     <p class="text-[11px] text-slate-500 text-center mt-2">Simulates live Razorpay webhooks and auto-updates recovery status</p>
                 </div>
+                
+                <!-- I Need More Time Button -->
+                <div class="mt-4 text-center">
+                    <button onclick="document.getElementById('promise-modal').classList.remove('hidden')" class="text-xs text-slate-400 underline hover:text-slate-300 transition-colors">I need more time to pay</button>
+                </div>
+
+                <!-- Promise Modal -->
+                <div id="promise-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                    <div class="bg-slate-900 border border-slate-700 p-6 rounded-xl max-w-sm w-full text-left">
+                        <h3 class="text-lg font-bold text-white mb-2">Request Extension</h3>
+                        <p class="text-sm text-slate-400 mb-4">Select a date when you promise to make the payment. Recovery reminders will be paused until then.</p>
+                        <form hx-post="/api/promise/{{ workflow.id }}" hx-target="#payment-box" hx-swap="outerHTML">
+                            <input type="date" name="promise_date" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm mb-4 focus:ring-emerald-500 focus:border-emerald-500">
+                            <div class="flex justify-end space-x-2">
+                                <button type="button" onclick="document.getElementById('promise-modal').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm rounded-lg text-white font-medium transition-colors">Cancel</button>
+                                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm rounded-lg text-white font-bold transition-colors">Submit Promise</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
                 {% endif %}
             </div>
 

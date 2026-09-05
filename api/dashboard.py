@@ -4,10 +4,11 @@ Dashboard API routes — serves the web UI and handles HTMX interactions.
 
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select, and_
@@ -738,6 +739,52 @@ async def batch_report(request: Request, db: AsyncSession = Depends(get_db)):
         "channel_stats": channel_stats,
         "show_report": True,
     })
+
+
+@router.post("/api/promise/{workflow_id}")
+async def submit_promise(
+    workflow_id: str,
+    promise_date: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle customer submitting a promise to pay."""
+    stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+    result = await db.execute(stmt)
+    workflow = result.scalar_one_or_none()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    if workflow.is_terminal:
+        return HTMLResponse(content="<div class='text-red-400 font-bold'>This workflow is already completed.</div>")
+
+    workflow.status = "awaiting_promise"
+    workflow.promise_date = datetime.strptime(promise_date, "%Y-%m-%d").date()
+    
+    audit = AuditLog(
+        id=str(uuid.uuid4()),
+        workflow_id=workflow.id,
+        action="customer_promised_payment",
+        actor="customer",
+        category="action",
+        details=f"Customer promised to pay on {promise_date}. Recovery paused.",
+    )
+    db.add(audit)
+    
+    await db.commit()
+    
+    html = f"""
+    <div class="flex flex-col items-center py-6 text-center">
+        <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <h3 class="text-xl font-bold text-white mb-2">Promise Recorded</h3>
+        <p class="text-slate-400 text-sm">Thank you. We have recorded your promise to pay on <strong class="text-white">{promise_date}</strong>. Our recovery reminders are now paused.</p>
+    </div>
+    """
+    return HTMLResponse(content=html)
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
