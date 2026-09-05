@@ -277,9 +277,9 @@ class NotificationService:
             if self._twilio_client:
                 import asyncio
                 twiml = f"""<Response>
-                    <Say voice="Polly.Aditi" language="hi-IN">{message}</Say>
+                    <Say voice="Polly.Kajal-Neural" language="en-IN">{message}</Say>
                     <Pause length="1"/>
-                    <Say voice="Polly.Aditi" language="hi-IN">Kripya apna payment link check karein aur payment complete karein. Dhanyawad.</Say>
+                    <Say voice="Polly.Kajal-Neural" language="en-IN">Thank you for choosing RecovrAI. Have a great day.</Say>
                 </Response>"""
 
                 def _call_sync():

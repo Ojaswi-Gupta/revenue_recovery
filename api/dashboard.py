@@ -488,9 +488,14 @@ async def trigger_voice_call(workflow_id: str, to_verified: bool = False, to_tes
             return HTMLResponse('<div class="text-red-400 text-xs p-2">Workflow not found</div>', status_code=404)
 
         target_phone = settings.test_phone_number if (to_verified or to_test) else workflow.customer_phone
+        first_name = workflow.customer_name.split()[0]
+        amount_val = int(workflow.amount_at_risk_inr)
+        event_name = workflow.event_type.replace('_', ' ')
         spoken_message = (
-            f"Namaste {workflow.customer_name} ji. Yeh RecovrAI se automated revenue recovery call hai. "
-            f"Aapka {workflow.event_type.replace('_', ' ')} ka payment of rupees {int(workflow.amount_at_risk_inr)} abhi tak process nahi ho paya tha."
+            f"Hello {first_name}. This is an automated courtesy reminder from RecovrAI regarding your {event_name}. "
+            f"Your pending payment of {amount_val} rupees could not be processed. "
+            f"We have sent a secure payment link directly to your mobile phone via SMS and WhatsApp. "
+            f"Please click the link to complete your payment at your earliest convenience."
         )
 
         action = await orchestrator.notification_service.make_voice_call(
