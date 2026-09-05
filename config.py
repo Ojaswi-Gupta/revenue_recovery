@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     host: str = "0.0.0.0"
     port: int = 8000
+    app_base_url: str = "" # e.g. https://your-ngrok.app
 
     # === Database ===
     database_url: str = "sqlite+aiosqlite:///./recovrai.db"

@@ -276,10 +276,14 @@ class NotificationService:
         try:
             if self._twilio_client:
                 import asyncio
+                # Interactive IVR using <Gather>
+                base_url = self.settings.app_base_url.rstrip("/") if self.settings.app_base_url else ""
+                callback_url = f"{base_url}/api/voice/twiml-callback?workflow_id={workflow_id}"
                 twiml = f"""<Response>
-                    <Say voice="Polly.Kajal-Neural" language="en-IN">{message}</Say>
-                    <Pause length="1"/>
-                    <Say voice="Polly.Kajal-Neural" language="en-IN">Thank you for choosing RecovrAI. Have a great day.</Say>
+                    <Gather action="{callback_url}" method="POST" numDigits="1" timeout="5">
+                        <Say voice="Polly.Kajal-Neural" language="en-IN">{message} Hello! Press 1 to get an instant payment link on WhatsApp. Press 2 to promise payment tomorrow. Press 3 to speak with our support agent.</Say>
+                    </Gather>
+                    <Say voice="Polly.Kajal-Neural" language="en-IN">We didn't receive any input. Thank you for choosing RecovrAI. Have a great day.</Say>
                 </Response>"""
 
                 def _call_sync():

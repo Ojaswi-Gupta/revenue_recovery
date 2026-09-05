@@ -269,3 +269,83 @@ async def text_demo(workflow_id: str = Form(...), message: str = Form(...)):
         html += '<div class="text-red-400">> Call ended.</div>'
         
     return HTMLResponse(html)
+
+@router.post("/twiml-callback")
+async def twiml_callback(
+    request: Request,
+    Digits: str = Form(None),
+    CallSid: str = Form(None),
+    To: str = Form(None)
+):
+    """
+    Twilio callback for the interactive voice response menu.
+    User is prompted to press 1, 2, or 3.
+    """
+    from ..services.recovery_orchestrator import RecoveryOrchestrator
+    
+    # We can retrieve workflow by phone number in a real app or pass workflow_id via callback url query params.
+    # We will assume `workflow_id` is passed as a query param in the TwiML action URL, 
+    # e.g., /api/voice/twiml-callback?workflow_id=...
+    workflow_id = request.query_params.get("workflow_id")
+    
+    orchestrator = RecoveryOrchestrator()
+    twiml_response = "<Response>"
+
+    async with get_db_session() as session:
+        workflow = None
+        if workflow_id:
+            stmt = select(RecoveryWorkflow).where(RecoveryWorkflow.id == workflow_id)
+            result = await session.execute(stmt)
+            workflow = result.scalar_one_or_none()
+
+        if Digits == "1":
+            twiml_response += '<Say voice="Polly.Kajal-Neural" language="en-IN">We have sent the payment link to your WhatsApp. Thank you.</Say>'
+            if workflow:
+                # Trigger WhatsApp reminder
+                message = f"Hi {workflow.customer_name.split()[0]}, your payment of ₹{workflow.amount_at_risk_inr:.0f} is pending. Pay securely here: /pay/{workflow.id}"
+                action = await orchestrator.notification_service.send_whatsapp(
+                    phone=workflow.customer_phone,
+                    message=message,
+                    workflow_id=workflow.id
+                )
+                session.add(action)
+                
+                audit = AuditLog(
+                    id=str(uuid.uuid4()),
+                    workflow_id=workflow.id,
+                    action="voice_ivr_pressed_1",
+                    actor="customer",
+                    category="action",
+                    details="Customer pressed 1 on voice call to get WhatsApp link",
+                )
+                session.add(audit)
+                
+        elif Digits == "2":
+            twiml_response += '<Say voice="Polly.Kajal-Neural" language="en-IN">We have recorded your promise to pay tomorrow. Thank you.</Say>'
+            if workflow:
+                from datetime import timedelta
+                # Mark as awaiting promise for tomorrow
+                workflow.status = "awaiting_promise"
+                workflow.promise_date = datetime.utcnow().date() + timedelta(days=1)
+                
+                audit = AuditLog(
+                    id=str(uuid.uuid4()),
+                    workflow_id=workflow.id,
+                    action="voice_ivr_pressed_2",
+                    actor="customer",
+                    category="action",
+                    details="Customer pressed 2 on voice call to promise payment tomorrow",
+                )
+                session.add(audit)
+                
+        elif Digits == "3":
+            twiml_response += '<Say voice="Polly.Kajal-Neural" language="en-IN">Connecting you to our support agent. Please hold.</Say>'
+            if workflow:
+                # Escalate to human
+                await orchestrator._escalate_workflow(session, workflow, "Customer pressed 3 during IVR call for human support")
+                
+        else:
+            twiml_response += '<Say voice="Polly.Kajal-Neural" language="en-IN">We did not receive a valid input. Goodbye.</Say>'
+            
+    twiml_response += "</Response>"
+    return HTMLResponse(content=twiml_response, media_type="text/xml")
