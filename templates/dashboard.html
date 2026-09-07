@@ -49,6 +49,7 @@
             ⚡ Seed Data
         </button>
         <button hx-post="/api/batch" hx-target="#action-result" hx-swap="innerHTML"
+                onclick="document.getElementById('action-result').innerHTML='<div class=\'text-blue-400 text-sm p-2 animate-pulse\'>⏳ Processing batch (this may take 2-3 minutes due to LLM diagnosis)...</div>'"
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
             🚀 Run Batch Recovery
         </button>
@@ -57,6 +58,7 @@
             🔗 Test Real Link
         </button>
         <button hx-post="/api/test_all_channels" hx-target="#action-result" hx-swap="innerHTML"
+                onclick="document.getElementById('action-result').innerHTML='<div class=\'text-pink-400 text-sm p-2 animate-pulse\'>🚀 Dispatching Email, WhatsApp, and Voice Call... Please wait 10s...</div>'"
                 class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-md text-sm font-medium transition-colors"
                 title="Bypass time delays and instantly test Email, WhatsApp, and Voice Call right now">
             🚀 Test All Channels Instantly
