@@ -164,8 +164,13 @@ async def seed_data(request: Request):
     from ..seed.synthetic_data import seed_database
     await seed_database()
     return HTMLResponse(
-        '<div class="text-emerald-400 text-sm p-2">'
-        '✅ Database seeded with 105 synthetic records</div>'
+        '<div class="bg-blue-950/60 border border-blue-500/40 text-blue-200 text-sm px-4 py-3 rounded-lg shadow-md flex items-center gap-3">'
+        '<span class="text-xl">✅</span>'
+        '<div>'
+        '<div class="font-medium">Synthetic Data Injected</div>'
+        '<div class="text-blue-400/80 text-xs mt-0.5">105 historic un-processed payment failures have been seeded into the database for testing.</div>'
+        '</div>'
+        '</div>'
     )
 
 
@@ -179,10 +184,13 @@ async def run_batch(request: Request):
         results = await orchestrator.process_batch(session)
 
     return HTMLResponse(
-        f'<div class="text-emerald-400 text-sm p-2">'
-        f'✅ Batch complete: {results["total_processed"]} processed, '
-        f'{results["recovered"]} recovered, '
-        f'₹{results["amount_recovered"] / 100:,.2f} recovered</div>'
+        f'<div class="bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 text-sm px-4 py-3 rounded-lg shadow-md flex items-center gap-3">'
+        f'<span class="text-xl">✅</span>'
+        f'<div>'
+        f'<div class="font-medium">Batch Processing Completed Successfully</div>'
+        f'<div class="text-emerald-400/80 text-xs mt-0.5">{results["total_processed"]} historic failures diagnosed by AI. {results["recovered"]} auto-recovered instantly (₹{results["amount_recovered"] / 100:,.2f}). Remaining routed to intervention channels. Check Batch Report.</div>'
+        f'</div>'
+        f'</div>'
     )
 
 
@@ -892,12 +900,22 @@ async def test_all_channels(db: AsyncSession = Depends(get_db)):
         )
         
         return HTMLResponse(
-            content=f"<div class='p-4 bg-emerald-900/50 text-emerald-400 rounded-lg border border-emerald-700 shadow-sm'>✅ Sent Email, WhatsApp, and Voice Call instantly! Check your phone and inbox.</div>"
+            content=f"<div class='bg-pink-950/60 border border-pink-500/40 text-pink-200 text-sm px-4 py-3 rounded-lg shadow-md flex items-center gap-3'>"
+            f"<span class='text-xl'>🚀</span>"
+            f"<div>"
+            f"<div class='font-medium'>Omnichannel Recovery Dispatched!</div>"
+            f"<div class='text-pink-400/80 text-xs mt-0.5'>Successfully dispatched to {workflow.customer_email} and {settings.test_phone_number} across 3 channels. Please check your inbox and phone.</div>"
+            f"</div></div>"
         )
     except Exception as e:
         logger.error(f"Failed to test all channels: {e}")
         return HTMLResponse(
-            content=f"<div class='p-4 bg-red-900/50 text-red-400 rounded-lg border border-red-700 shadow-sm'>❌ Error: {str(e)}</div>"
+            content=f"<div class='bg-red-950/60 border border-red-500/40 text-red-200 text-sm px-4 py-3 rounded-lg shadow-md flex items-center gap-3'>"
+            f"<span class='text-xl'>❌</span>"
+            f"<div>"
+            f"<div class='font-medium'>Omnichannel Dispatch Failed</div>"
+            f"<div class='text-red-400/80 text-xs mt-0.5'>{str(e)}</div>"
+            f"</div></div>"
         )
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
