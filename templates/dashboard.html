@@ -130,6 +130,7 @@
         });
     </script>
 
+    {% if not show_report %}
     <!-- Workflows Table -->
     <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
@@ -229,5 +230,47 @@
             </table>
         </div>
     </div>
+    {% else %}
+    <!-- Batch Metrics Table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+            <h2 class="text-lg font-medium text-white">Batch Recovery Reports</h2>
+            <span class="text-xs text-gray-500">{{ metrics|length }} generated</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-400">
+                <thead class="bg-gray-700/50 text-gray-300 uppercase text-xs">
+                    <tr>
+                        <th class="px-6 py-3 font-medium">Batch ID</th>
+                        <th class="px-6 py-3 font-medium">Time Run</th>
+                        <th class="px-6 py-3 font-medium">Size</th>
+                        <th class="px-6 py-3 font-medium">Amount At Risk</th>
+                        <th class="px-6 py-3 font-medium">Recovered</th>
+                        <th class="px-6 py-3 font-medium">Recovery Rate</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {% for m in metrics %}
+                    <tr class="hover:bg-gray-700/30 transition-colors">
+                        <td class="px-6 py-4 font-mono text-gray-300">{{ m.batch_id[:8] }}</td>
+                        <td class="px-6 py-4">{{ m.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="px-6 py-4 font-medium">{{ m.batch_size }} rows</td>
+                        <td class="px-6 py-4 font-medium text-red-400">₹{{ "%.2f"|format(m.total_amount_at_risk) }}</td>
+                        <td class="px-6 py-4 font-medium text-emerald-400">₹{{ "%.2f"|format(m.total_amount_recovered) }}</td>
+                        <td class="px-6 py-4 font-bold text-blue-400">{{ "%.1f"|format(m.recovery_rate_percent) }}%</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not metrics %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                            No batch reports generated yet. Click "Run Batch Recovery" to analyze pending data.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
