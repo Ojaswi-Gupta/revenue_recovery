@@ -57,11 +57,13 @@ async def workflows_page(
     """Workflows list page with filtering."""
     workflows = await _get_recent_workflows(db, limit=100, status=status, event_type=event_type)
     stats = await _get_dashboard_stats(db)
+    channel_stats = await _get_channel_stats(db)
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
         "workflows": workflows,
+        "channel_stats": channel_stats,
         "filter_status": status,
         "filter_event_type": event_type,
     })
